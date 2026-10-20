@@ -4,7 +4,7 @@ PIO  ?= pio
 PORT ?= $(firstword $(wildcard /dev/cu.usbmodem*) $(wildcard /dev/ttyACM*))
 TOOL  = uv run -q tools/meshputer.py $(if $(PORT),--port $(PORT))
 
-.PHONY: help setup build flash monitor test console shot logs release site serve screenshots clean
+.PHONY: help setup build flash monitor test interop console shot logs release site serve screenshots clean
 
 help:
 	@echo "make setup            install PlatformIO and the serial tool deps (needs uv)"
@@ -12,6 +12,7 @@ help:
 	@echo "make flash            build and flash over USB"
 	@echo "make monitor          raw serial monitor (Ctrl+C to quit)"
 	@echo "make test             native unit tests for src/core"
+	@echo "make interop          check Nostr DMs interoperate with rust-nostr"
 	@echo "make console CMD=...  console commands, e.g. CMD='status \"send ch0 hi\"'"
 	@echo "make shot [OUT=f.png] save the device screen as PNG"
 	@echo "make logs             stream device log lines"
@@ -34,6 +35,10 @@ monitor:
 
 test:
 	bash tests/run_tests.sh
+
+# Cross-checks the Nostr core against rust-nostr (no network, no device).
+interop: test
+	uv run -q tests/interop/interop.py
 
 console:
 	$(TOOL) run $(CMD)

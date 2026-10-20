@@ -1,0 +1,20 @@
+{
+  "name": "secp256k1",
+  "version": "0.7.1",
+  "description": "bitcoin-core/secp256k1 v0.7.1 (MIT, see COPYING), vendored unmodified; only the ECDH, extrakeys and schnorrsig modules are built.",
+  "license": "MIT",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "include",
+    "srcFilter": ["+<secp256k1.c>", "+<precomputed_ecmult.c>", "+<precomputed_ecmult_gen.c>"],
+    "flags": [
+      "-DENABLE_MODULE_ECDH=1",
+      "-DENABLE_MODULE_EXTRAKEYS=1",
+      "-DENABLE_MODULE_SCHNORRSIG=1",
+      "-DECMULT_WINDOW_SIZE=4",
+      "-DCOMB_BLOCKS=11",
+      "-DCOMB_TEETH=6",
+      "-Wno-unused-function"
+    ]
+  }
+}
