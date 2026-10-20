@@ -1,0 +1,4 @@
+nip44.vectors.json: the official NIP-44 v2 test vectors, from
+https://github.com/paulmillr/nip44 (nip44.vectors.json), as referenced by the
+public-domain NIP-44 specification (https://github.com/nostr-protocol/nips/blob/master/44.md).
+Used unmodified by tests/nostr_test.cpp.
