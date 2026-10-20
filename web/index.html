@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meshputer — Meshtastic messenger for the Cardputer</title>
+<meta name="description" content="Turn an M5Stack Cardputer into a pocket Meshtastic messenger. Pairs over Bluetooth with the radio you already own. Install from the browser.">
+<meta property="og:title" content="Meshputer">
+<meta property="og:description" content="A pocket Meshtastic messenger for the M5Stack Cardputer. Install from your browser.">
+<meta property="og:image" content="screens/chat.png">
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+<style>
+  :root {
+    --bg: #0c0c0c; --panel: #161514; --line: #2a2725;
+    --text: #e8e4df; --dim: #8a847e; --accent: #ff6b35; --ok: #2ecc71;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 48px 16px 72px; }
+  a { color: var(--accent); }
+  h1 { font: 700 44px/1.1 var(--mono); letter-spacing: 0.04em; margin: 0 0 12px; }
+  h1 span { color: var(--accent); }
+  h2 { font: 600 20px var(--mono); margin: 56px 0 16px; }
+  .lede { font-size: 20px; color: var(--text); max-width: 34em; margin: 0 0 8px; }
+  .sub { color: var(--dim); margin: 0 0 32px; max-width: 40em; }
+  .hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 40px; align-items: center; }
+  .device { background: #1d1c1b; border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .device img { width: 100%; display: block; border-radius: 4px; image-rendering: pixelated; }
+  .install { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .install p { margin: 10px 0 0; color: var(--dim); font-size: 14px; }
+  esp-web-install-button button[slot="activate"] {
+    font: 600 16px var(--mono); background: var(--accent); color: #111; border: 0;
+    border-radius: 8px; padding: 12px 20px; cursor: pointer; }
+  .warn { color: var(--accent); font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .card b { font-family: var(--mono); display: block; margin-bottom: 4px; }
+  .card span { color: var(--dim); font-size: 14px; }
+  .shots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .shots img { width: 100%; border-radius: 6px; border: 1px solid var(--line); image-rendering: pixelated; }
+  ol { padding-left: 20px; } li { margin: 6px 0; }
+  code { font-family: var(--mono); background: var(--panel); border: 1px solid var(--line);
+         border-radius: 4px; padding: 1px 5px; font-size: 14px; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px;
+        overflow-x: auto; font: 13px/1.5 var(--mono); }
+  footer { margin-top: 64px; color: var(--dim); font-size: 14px; border-top: 1px solid var(--line); padding-top: 16px; }
+  @media (max-width: 720px) {
+    .hero, .grid, .shots { grid-template-columns: 1fr; }
+    h1 { font-size: 34px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div>
+      <h1>MESH<span>PUTER</span></h1>
+      <p class="lede">A pocket Meshtastic messenger for the M5Stack Cardputer.</p>
+      <p class="sub">Pair it over Bluetooth with the Meshtastic radio you already own and chat over LoRa from a real keyboard. No phone, no Wi-Fi, no extra radio hardware.</p>
+      <div class="install">
+        <esp-web-install-button manifest="manifest.json">
+          <button slot="activate">Install Meshputer {{VERSION}}</button>
+          <span slot="unsupported" class="warn">Your browser can't flash devices. Use desktop Chrome or Edge.</span>
+          <span slot="not-allowed" class="warn">Open this page over HTTPS to install.</span>
+        </esp-web-install-button>
+        <p>Plug the Cardputer in with a USB-C data cable, press Install, pick the serial port.
+           Updating keeps your paired radio and settings.</p>
+      </div>
+    </div>
+    <div class="device"><img src="screens/chat.png" alt="Chat between two Cardputers on the Meshputer screen" width="720" height="405"></div>
+  </section>
+
+  <h2>What you need</h2>
+  <ol>
+    <li>An <b>M5Stack Cardputer</b> (v1.1) or <b>Cardputer ADV</b>.</li>
+    <li>Any <b>Meshtastic radio with Bluetooth</b> — Heltec, T-Beam, RAK, T-Echo, Station G2… running stock firmware.</li>
+    <li>Its Bluetooth PIN (default <code>123456</code>; radios with a screen show it).</li>
+  </ol>
+
+  <h2>What it does</h2>
+  <div class="grid">
+    <div class="card"><b>Find &amp; pair</b><span>Scans for radios nearby, pairs with the PIN, reconnects on its own.</span></div>
+    <div class="card"><b>Chat</b><span>Direct messages and channels, with sent / relayed / delivered ticks.</span></div>
+    <div class="card"><b>Identity</b><span>See who anyone is — name, hardware, hops, signal, encryption. Edit your own name.</span></div>
+    <div class="card"><b>History</b><span>Conversations saved to the SD card, per radio.</span></div>
+    <div class="card"><b>Emoji</b><span>Picker sends real emoji, so phones see them too. Quick replies built in.</span></div>
+    <div class="card"><b>Battery first</b><span>80 MHz CPU, Wi-Fi never on, Bluetooth only when needed, screen sleeps.</span></div>
+  </div>
+
+  <h2>Screens</h2>
+  <div class="shots">
+    <img src="screens/home.png" alt="Home screen" loading="lazy" width="720" height="405">
+    <img src="screens/nodes.png" alt="Nodes heard on the mesh" loading="lazy" width="720" height="405">
+    <img src="screens/identity.png" alt="Identity of another node" loading="lazy" width="720" height="405">
+    <img src="screens/settings.png" alt="Settings" loading="lazy" width="720" height="405">
+  </div>
+
+  <h2>Other ways to install</h2>
+  <p>Download the <a href="firmware/meshputer-merged.bin">single image</a> ({{VERSION}}) for M5Burner, M5Launcher (as full firmware) or esptool:</p>
+  <pre>esptool.py --chip esp32s3 write_flash 0x0 meshputer-merged.bin</pre>
+  <p class="sub">The single image resets saved settings; the browser installer above keeps them.</p>
+
+  <footer>
+    Open source (GPL-3.0) · <a href="https://github.com/Dvorson/meshputer">github.com/Dvorson/meshputer</a> ·
+    Meshtastic® is a registered trademark of Meshtastic LLC; this project is not affiliated.
+  </footer>
+</main>
+</body>
+</html>

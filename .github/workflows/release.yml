@@ -1,0 +1,50 @@
+name: Release
+
+# Push a tag like v0.1.0: builds, attaches the single-image firmware to a
+# GitHub Release, and publishes the browser installer to GitHub Pages.
+# One-time repo setup: Settings > Pages > Source: GitHub Actions.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+      - run: pip install platformio
+      - name: Unit tests (native)
+        run: bash tests/run_tests.sh
+      - name: Build firmware and installer site
+        run: tools/build_site.sh "${GITHUB_REF_NAME}" site
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/meshputer-${{ github.ref_name }}.bin
+          generate_release_notes: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
