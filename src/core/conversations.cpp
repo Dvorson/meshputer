@@ -207,8 +207,11 @@ std::string hex(uint32_t v) {
 std::string ConversationStore::serialize(const Conversation& conv) {
     std::string out = "MPC1\n";
     out += "k\t";
-    out += conv.key.isChannel ? "c" : "d";
-    out += "\t" + hex(conv.key.peer) + "\t" + std::to_string(conv.key.channel) + "\n";
+    if (conv.key.isNostr()) out += "n\t" + conv.key.nostr + "\t0\n";
+    else {
+        out += conv.key.isChannel ? "c" : "d";
+        out += "\t" + hex(conv.key.peer) + "\t" + std::to_string(conv.key.channel) + "\n";
+    }
     out += "u\t";
     out += conv.unread ? "1" : "0";
     out += "\t" + std::to_string(conv.lastActivity) + "\n";
@@ -241,9 +244,14 @@ bool ConversationStore::parse(const std::string& data, Conversation& out) {
         if (tag == 'k') {
             auto f = splitTabs(line, 4);
             if (f.size() != 4) return false;
-            out.key.isChannel = (f[1] == "c");
-            out.key.peer = hexField(f[2]);
-            out.key.channel = static_cast<uint8_t>(decField(f[3]));
+            if (f[1] == "n") {
+                if (f[2].size() != 64) return false;
+                out.key.nostr = f[2];
+            } else {
+                out.key.isChannel = (f[1] == "c");
+                out.key.peer = hexField(f[2]);
+                out.key.channel = static_cast<uint8_t>(decField(f[3]));
+            }
             sawKey = true;
         } else if (tag == 'u') {
             auto f = splitTabs(line, 3);
@@ -286,6 +294,7 @@ int ConversationStore::adopt(const Conversation& conv) {
 }
 
 std::string ConversationStore::fileName(const ConversationKey& key) {
+    if (key.isNostr()) return "n" + key.nostr.substr(0, 16) + ".txt";  // FAT: keep it short
     if (key.isChannel) return "c" + std::to_string(key.channel) + ".txt";
     return "d" + hex(key.peer) + ".txt";
 }

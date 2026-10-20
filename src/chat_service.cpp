@@ -6,6 +6,7 @@
 #include "core/text_util.h"
 #include "log.h"
 #include "meshtastic_client.h"
+#include "nostr_service.h"
 #include "power.h"
 #include "settings.h"
 #include "sound.h"
@@ -154,12 +155,35 @@ void loop() {
             break;
         }
     }
+
+    NostrService::Incoming in;
+    while (NostrService::popIncoming(in)) {
+        if (in.kind == NostrService::Incoming::Kind::Message) {
+            ConversationKey key = ConversationKey::nostrDirect(in.fromHex);
+            int idx = sStore.find(key);
+            bool onScreen = idx >= 0 && idx == sActive;
+            idx = sStore.addIncoming(key, 0, in.text, in.ref, static_cast<uint32_t>(in.createdAt), !onScreen);
+            if (idx < 0) continue;
+            persist(idx);
+            setToast("@" + TextUtil::toDisplay(NostrService::displayName(in.fromHex)) + ": " +
+                     TextUtil::toDisplay(in.text));
+            Sound::message();
+            Power::wakeForMessage();
+        } else {
+            // Over the internet "relayed" means at least one relay stored it for the recipient.
+            Delivery d = in.kind == NostrService::Incoming::Kind::Accepted ? Delivery::Relayed : Delivery::Failed;
+            int idx = sStore.updateDelivery(in.ref, d);
+            if (idx >= 0) persist(idx);
+            if (idx >= 0 && d == Delivery::Failed) setToast("Not delivered: no relay accepted it");
+        }
+    }
 }
 
 ConversationStore& store() { return sStore; }
 
 int openDirect(uint32_t node) { return sStore.ensure(ConversationKey::direct(node)); }
 int openChannel(uint8_t channel) { return sStore.ensure(ConversationKey::onChannel(channel)); }
+int openNostr(const std::string& pubHex) { return sStore.ensure(ConversationKey::nostrDirect(pubHex)); }
 
 void setActive(int convIdx) {
     sActive = convIdx;
@@ -175,6 +199,21 @@ std::string send(int convIdx, const std::string& utf8) {
     if (sDemo) return "Demo data loaded - reboot to chat";
     if (utf8.empty()) return "Nothing to send";
     if (utf8.size() > MeshProto::kMaxTextBytes) return "Too long";
+
+    if (conv->key.isNostr()) {
+        std::string err;
+        uint32_t ref = NostrService::sendDm(conv->key.nostr, utf8, err);
+        if (ref == 0) {
+            Sound::error();
+            return err;
+        }
+        ConversationKey key = conv->key;
+        int idx = sStore.addOutgoing(key, 0, utf8, ref, 0);
+        persist(idx);
+        Sound::sent();
+        return "";
+    }
+
     if (!gMesh.ready()) return "Radio not connected";
 
     uint32_t to;
@@ -201,12 +240,14 @@ std::string send(int convIdx, const std::string& utf8) {
 }
 
 std::string title(const Conversation& conv) {
+    if (conv.key.isNostr()) return "@" + TextUtil::toDisplay(NostrService::displayName(conv.key.nostr));
     if (conv.key.isChannel) return "#" + TextUtil::toDisplay(gMesh.channelName(conv.key.channel));
     return TextUtil::toDisplay(gMesh.nodeName(conv.key.peer));
 }
 
-std::string senderLabel(const ChatMessage& msg) {
+std::string senderLabel(const Conversation& conv, const ChatMessage& msg) {
     if (msg.fromMe) return "me";
+    if (conv.key.isNostr()) return TextUtil::toDisplay(NostrService::displayName(conv.key.nostr));
     return TextUtil::toDisplay(gMesh.nodeShortName(msg.from));
 }
 
@@ -215,7 +256,7 @@ std::string preview(const Conversation& conv, size_t width) {
     const ChatMessage& m = conv.messages.back();
     std::string text = TextUtil::toDisplay(m.text);
     for (char& c : text) if (c == '\n') c = ' ';
-    std::string who = m.fromMe ? "me" : senderLabel(m);
+    std::string who = senderLabel(conv, m);
     return TextUtil::ellipsize(who + ": " + text, width);
 }
 

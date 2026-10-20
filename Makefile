@@ -28,7 +28,8 @@ build:
 	$(PIO) run
 
 flash:
-	$(PIO) run -t upload $(if $(PORT),--upload-port $(PORT))
+	@test -n "$(PORT)" || { echo "No Cardputer found on USB: plug it in (or pass PORT=...)"; exit 1; }
+	$(PIO) run -t upload --upload-port $(PORT)
 
 monitor:
 	$(PIO) device monitor $(if $(PORT),-p $(PORT))

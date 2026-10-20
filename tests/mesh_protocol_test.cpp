@@ -185,6 +185,7 @@ TEST(decode_node_info_with_user) {
     CHECK_EQ(ev.node.user.id, std::string("!12345678"));
     CHECK_EQ(std::string(hwModelName(ev.node.user.hwModel)), std::string("Heltec V3"));
     CHECK(ev.node.user.hasPublicKey);
+    CHECK_EQ(ev.node.user.publicKeyHex.size(), (size_t)64);
     CHECK(ev.node.hasHopsAway);
     CHECK_EQ(ev.node.hopsAway, 2);
     CHECK_EQ(ev.node.batteryLevel, 87u);

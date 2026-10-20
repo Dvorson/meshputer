@@ -10,7 +10,9 @@
 #include "chat_service.h"
 #include "debug_console.h"
 #include "log.h"
+#include "core/crypto.h"
 #include "meshtastic_client.h"
+#include "nostr_service.h"
 #include "power.h"
 #include "screens/screens.h"
 #include "sound.h"
@@ -40,7 +42,9 @@ void setup() {
     Board::begin();
     Power::begin();
     LOG("APP", "Meshputer starting, sd=%d", Board::sdReady());
+    Crypto::setRandom([](uint8_t* out, size_t len) { esp_fill_random(out, len); });  // hardware RNG
     gMesh.begin();
+    NostrService::begin();
     Chat::begin();
     Nav::reset(&gHomeScreen);
 }
@@ -49,6 +53,7 @@ void loop() {
     Board::update();
     DebugConsole::poll();
     gMesh.loop();
+    NostrService::loop();
     Chat::loop();
     Power::loop();
     announceLinkChanges();

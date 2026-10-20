@@ -202,6 +202,18 @@ private:
     uint32_t _seenMesh = 0xFFFFFFFF;
 };
 
+// Our Nostr identity as a QR code (nostr:npub...) so a phone app can scan it.
+class NostrIdScreen : public Screen {
+public:
+    const char* name() const override { return "nostr-id"; }
+    void key(const KeyInput& k) override;
+    void tick() override;
+    void draw(M5Canvas& c) override;
+
+private:
+    std::string _seenStatus;
+};
+
 extern HomeScreen gHomeScreen;
 extern RadioScreen gRadioScreen;
 extern PinScreen gPinScreen;
@@ -212,6 +224,7 @@ extern ChatScreen gChatScreen;
 extern CannedScreen gCannedScreen;
 extern EmojiScreen gEmojiScreen;
 extern SettingsScreen gSettingsScreen;
+extern NostrIdScreen gNostrIdScreen;
 
 // Opens the chat for a conversation (from any screen).
 void openChat(int convIdx);

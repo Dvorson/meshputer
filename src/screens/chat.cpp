@@ -148,7 +148,7 @@ void ChatScreen::drawMessages(M5Canvas& c) {
         if (m.fromMe) c.fillRect(x, msgTop, 2, h - 2, Color::ACCENT());
 
         // Sender line: who, and for our own messages how far it got.
-        std::string who = Chat::senderLabel(m);
+        std::string who = Chat::senderLabel(*conv, m);
         std::string status;
         if (m.fromMe) status = deliveryLabel(m.delivery);
         else status = ageLabel(m.timestamp);

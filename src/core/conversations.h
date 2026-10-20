@@ -24,12 +24,16 @@ const char* deliveryLabel(Delivery d);
 
 struct ConversationKey {
     bool isChannel = false;
-    uint32_t peer = 0;     // node number for DMs
+    uint32_t peer = 0;     // node number for mesh DMs
     uint8_t channel = 0;   // channel index for channel conversations
+    std::string nostr;     // peer public key (hex) for Nostr DMs over the internet
 
     static ConversationKey direct(uint32_t node) { ConversationKey k; k.peer = node; return k; }
     static ConversationKey onChannel(uint8_t ch) { ConversationKey k; k.isChannel = true; k.channel = ch; return k; }
+    static ConversationKey nostrDirect(const std::string& pubHex) { ConversationKey k; k.nostr = pubHex; return k; }
+    bool isNostr() const { return !nostr.empty(); }
     bool operator==(const ConversationKey& o) const {
+        if (isNostr() || o.isNostr()) return nostr == o.nostr;
         return isChannel == o.isChannel && (isChannel ? channel == o.channel : peer == o.peer);
     }
 };

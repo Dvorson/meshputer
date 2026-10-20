@@ -155,6 +155,23 @@ TEST(adopt_keeps_activity_monotonic) {
     CHECK(s.at(idx)->lastActivity > 500);
 }
 
+TEST(nostr_conversations_are_their_own_key_and_persist) {
+    std::string pub(64, 'a');
+    ConversationStore s;
+    int n = s.ensure(ConversationKey::nostrDirect(pub));
+    int d = s.ensure(ConversationKey::direct(0));
+    CHECK(n != d);
+    CHECK_EQ(s.ensure(ConversationKey::nostrDirect(pub)), n);
+    s.addIncoming(ConversationKey::nostrDirect(pub), 0, "over the internet", 0x1234, 1792000000, true);
+
+    Conversation back;
+    CHECK(ConversationStore::parse(ConversationStore::serialize(*s.at(n)), back));
+    CHECK(back.key.isNostr());
+    CHECK_EQ(back.key.nostr, pub);
+    CHECK_EQ(back.messages.size(), (size_t)1);
+    CHECK_EQ(ConversationStore::fileName(back.key), std::string("naaaaaaaaaaaaaaaa.txt"));
+}
+
 TEST(file_names) {
     CHECK_EQ(ConversationStore::fileName(ConversationKey::direct(0xDA6573C0)), std::string("dda6573c0.txt"));
     CHECK_EQ(ConversationStore::fileName(ConversationKey::onChannel(2)), std::string("c2.txt"));

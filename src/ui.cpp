@@ -5,6 +5,7 @@
 #include "chat_service.h"
 #include "core/text_util.h"
 #include "meshtastic_client.h"
+#include "nostr_service.h"
 #include "settings.h"
 
 const ColorTheme& activeTheme() {
@@ -32,6 +33,7 @@ void header(M5Canvas& c, const std::string& title) {
     c.fillRect(Layout::MARGIN + 1, (Layout::HEADER_H - 5) / 2, 5, 5, linkColor());
 
     std::string right;
+    if (NostrService::state() == NostrService::State::Online) right += "@ ";  // internet link up
     int unread = Chat::store().unreadCount();
     if (unread > 0) right += "*" + std::to_string(unread) + " ";
     int bat = Board::batteryPercent();

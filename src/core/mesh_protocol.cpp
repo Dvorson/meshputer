@@ -31,6 +31,12 @@ void copyUser(const meshtastic_User& src, User& dst) {
     dst.role = static_cast<uint32_t>(src.role);
     dst.isLicensed = src.is_licensed;
     dst.hasPublicKey = src.public_key.size > 0;
+    static const char* kHex = "0123456789abcdef";
+    dst.publicKeyHex.clear();
+    for (pb_size_t i = 0; i < src.public_key.size; ++i) {
+        dst.publicKeyHex += kHex[src.public_key.bytes[i] >> 4];
+        dst.publicKeyHex += kHex[src.public_key.bytes[i] & 0xF];
+    }
 }
 
 void copyField(char* dst, size_t cap, const std::string& src) {

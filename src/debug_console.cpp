@@ -8,7 +8,10 @@
 #include "chat_service.h"
 #include "core/text_util.h"
 #include "log.h"
+#include "core/crypto.h"
+#include "core/nostr.h"
 #include "meshtastic_client.h"
+#include "nostr_service.h"
 #include "power.h"
 #include "screens/screens.h"
 #include "settings.h"
@@ -55,6 +58,11 @@ void printHelp() {
         "screen / shot              current screen / dump the frame (RGB565 hex)\n"
         "open home|nodes|channels|settings|radio|chat <n>|node <!id>   jump to a screen\n"
         "demo                       fictional nodes + chats for screenshots (RAM only)\n"
+        "internet on|off            Wi-Fi + Nostr relays\n"
+        "wifi <ssid> [password]     set the Wi-Fi network (stored on the device)\n"
+        "nostr                      identity and relay status\n"
+        "nostr dm <npub|hex> <text> private message over the internet (NIP-17)\n"
+        "nostr publish              re-publish profile and DM relay list\n"
         "reboot");
 }
 
@@ -260,6 +268,49 @@ void run(const std::string& raw) {
             Nav::push(&gNodeInfoScreen);
         } else { fail("unknown screen"); return; }
         done();
+    }
+    else if (cmd == "internet") {
+        NostrService::setEnabled(rest == "on");
+        done();
+    }
+    else if (cmd == "wifi") {
+        std::string ssid = nextWord(rest);
+        if (ssid.empty()) { fail("usage: wifi <ssid> [password]"); return; }
+        Settings& s = Settings::get();
+        s.wifiSsid = ssid;
+        s.wifiPassword = rest;
+        s.save();
+        if (s.internetEnabled) { NostrService::setEnabled(false); NostrService::setEnabled(true); }
+        done();
+    }
+    else if (cmd == "nostr") {
+        std::string sub = nextWord(rest);
+        if (sub.empty()) {
+            Serial.printf("npub=%s\nhex=%s\nstate=%d status=\"%s\" relays=%d time=%ld\n",
+                          NostrService::npub().c_str(), NostrService::pubHex().c_str(),
+                          static_cast<int>(NostrService::state()), NostrService::status().c_str(),
+                          NostrService::relaysOnline(), static_cast<long>(time(nullptr)));
+            Serial.print(NostrService::diagnostics().c_str());
+            done();
+        } else if (sub == "dm") {
+            std::string target = nextWord(rest), hrp;
+            uint8_t pub[32];
+            if (!Nostr::decodeKey(target, hrp, pub) || (hrp != "npub" && hrp != "hex")) { fail("bad npub"); return; }
+            int idx = Chat::openNostr(Crypto::toHex(pub, 32));
+            std::string err = Chat::send(idx, rest);
+            if (err.empty()) {
+                Serial.printf("conv=%d ref=%08lx\n", idx,
+                              static_cast<unsigned long>(Chat::store().at(idx)->messages.back().packetId));
+                done();
+            } else {
+                fail(err.c_str());
+            }
+        } else if (sub == "publish") {
+            NostrService::publishProfile();
+            done();
+        } else {
+            fail("usage: nostr [dm <npub> <text> | publish]");
+        }
     }
     else if (cmd == "screen") { Serial.println(Nav::current() ? Nav::current()->name() : "-"); done(); }
     else if (cmd == "shot") { dumpFrame(); done(); }

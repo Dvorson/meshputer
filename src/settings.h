@@ -20,6 +20,12 @@ struct Settings {
     std::string radioName;
     uint32_t lastNodeNum = 0;       // node of the saved radio, to show history offline
 
+    // Internet (Nostr over Wi-Fi). Off by default: Wi-Fi stays unpowered.
+    bool internetEnabled = false;
+    std::string wifiSsid;
+    std::string wifiPassword;
+    std::string nostrSecretHex;     // generated on first use; the device's Nostr identity
+
     // Display
     uint8_t brightness = 140;
     uint16_t dimAfterSec = 20;

@@ -18,6 +18,7 @@ ConversationStore& store();
 
 int openDirect(uint32_t node);
 int openChannel(uint8_t channel);
+int openNostr(const std::string& pubHex);
 
 // The conversation on screen; its new messages are not marked unread.
 void setActive(int convIdx);
@@ -27,7 +28,7 @@ std::string send(int convIdx, const std::string& utf8);
 
 // Display-ready (ASCII) labels.
 std::string title(const Conversation& conv);
-std::string senderLabel(const ChatMessage& msg);
+std::string senderLabel(const Conversation& conv, const ChatMessage& msg);
 std::string preview(const Conversation& conv, size_t width);
 
 // Screenshot/demo mode: replaces the in-memory conversations with fictional

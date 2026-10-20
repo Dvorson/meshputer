@@ -49,6 +49,7 @@ struct User {
     uint32_t role = 0;       // meshtastic_Config_DeviceConfig_Role
     bool isLicensed = false;
     bool hasPublicKey = false;
+    std::string publicKeyHex;  // the node's X25519 key (PKI DMs), hex
 };
 
 struct NodeInfo {

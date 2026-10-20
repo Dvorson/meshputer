@@ -45,6 +45,10 @@ void Settings::load() {
     radioAddrType = p.getUChar("radType", radioAddrType);
     radioName = getStr(p, "radName", radioName);
     lastNodeNum = p.getULong("lastNode", lastNodeNum);
+    internetEnabled = p.getBool("inet", internetEnabled);
+    wifiSsid = getStr(p, "wfssid", wifiSsid);
+    wifiPassword = getStr(p, "wfpass", wifiPassword);
+    nostrSecretHex = getStr(p, "nsec", nostrSecretHex);
     brightness = p.getUChar("bright", brightness);
     dimAfterSec = p.getUShort("dimSec", dimAfterSec);
     screenOffSec = p.getUShort("scrTmo", screenOffSec);
@@ -68,6 +72,10 @@ void Settings::save() {
     p.putUChar("radType", radioAddrType);
     p.putString("radName", radioName.c_str());
     p.putULong("lastNode", lastNodeNum);
+    p.putBool("inet", internetEnabled);
+    p.putString("wfssid", wifiSsid.c_str());
+    p.putString("wfpass", wifiPassword.c_str());
+    p.putString("nsec", nostrSecretHex.c_str());
     p.putUChar("bright", brightness);
     p.putUShort("dimSec", dimAfterSec);
     p.putUShort("scrTmo", screenOffSec);
