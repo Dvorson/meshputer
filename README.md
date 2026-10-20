@@ -42,7 +42,8 @@ radio on your belt or backpack, and the Cardputer in your hand.
 - 🪪 **Identity**: see who anyone is (name, id, hardware, role, hops, signal, battery, PKI encryption) and **edit your own name** — written to your radio and announced to the mesh
 - 💾 **History on SD**, kept per radio
 - 😀 **Emoji** sent as real emoji (phones see them) plus quick replies
-- 🔋 **Battery first**: 80 MHz CPU, Wi-Fi never on, Bluetooth only when needed, slow BLE interval once synced, screen dims then sleeps
+- 🌐 **Internet DMs (prototype)**: a Nostr identity on the device; private messages (NIP-17) with any Nostr app over Wi-Fi when you're out of LoRa range — off by default
+- 🔋 **Battery first**: 80 MHz CPU, Wi-Fi off unless you turn Internet on, Bluetooth only when needed, slow BLE interval once synced, screen dims then sleeps
 
 <p align="center">
   <img src="docs/screens/home.png" width="49%" alt="Home: radio, channels, nodes, conversations">
@@ -86,11 +87,27 @@ radio on the same channel settings, open *Nodes*, pick the other one, type.
 **Your name:** Settings → *Name* / *Short name*. It's saved on your radio
 (Meshtastic `set_owner`), read back to confirm, and broadcast so others see it.
 
+## Internet DMs over Nostr (prototype)
+
+Off by default. In Settings set *Wi-Fi* and *Wi-Fi password*, then switch
+*Internet* on. The Cardputer gets its own [Nostr](https://nostr.com) identity
+(*Nostr ID* shows it as a QR code) and:
+
+- publishes a profile named after your radio, linking the npub to your Meshtastic node id and key,
+- receives and sends private DMs (NIP-17, NIP-44 encryption) with any Nostr app that supports them — e.g. Amethyst, 0xchat,
+- talks to public relays (`nos.lol`, `relay.primal.net`); no server of yours, nothing to host.
+
+Internet chats appear on Home as `@name`. Limits of this prototype: one relay
+connection at a time (TLS memory next to Bluetooth, no PSRAM), relay TLS
+certificates are not verified yet (messages are still end-to-end encrypted and
+signed), and new internet chats start from the other side or via the console
+(`nostr dm <npub> <text>`).
+
 ## How it saves power
 
 | Part | Policy |
 |---|---|
-| Wi-Fi | never initialised — the Wi-Fi stack is not even linked |
+| Wi-Fi | off unless you turn *Internet* on; powered down again when you turn it off |
 | Bluetooth | on only while scanning, connecting, connected, or waiting to reconnect; off otherwise |
 | BLE link | fast interval while syncing the node list, then 120–160 ms |
 | CPU | 80 MHz; the main loop sleeps between polls |
@@ -103,7 +120,8 @@ Needs [uv](https://docs.astral.sh/uv/).
 
 ```bash
 make setup      # PlatformIO + tool deps
-make test       # native unit tests (protocol, conversations, text) — no device needed
+make test       # native unit tests (protocol, conversations, text, Nostr) — no device needed
+make interop    # Nostr DMs cross-checked against rust-nostr, both directions
 make flash      # build + flash over USB
 make logs       # stream device logs
 ```

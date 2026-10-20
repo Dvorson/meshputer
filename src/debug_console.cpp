@@ -109,9 +109,10 @@ void printConvs() {
     const ConversationStore& s = Chat::store();
     for (size_t i = 0; i < s.size(); ++i) {
         const Conversation* c = s.at(static_cast<int>(i));
-        Serial.printf("%u %s%s msgs=%u unread=%d title=\"%s\"\n", static_cast<unsigned>(i),
-                      c->key.isChannel ? "ch" : "dm",
-                      c->key.isChannel ? std::to_string(c->key.channel).c_str() : MeshProto::nodeIdString(c->key.peer).c_str(),
+        std::string where = c->key.isNostr() ? "nostr " + c->key.nostr.substr(0, 16)
+                          : c->key.isChannel ? "ch" + std::to_string(c->key.channel)
+                          : "dm" + MeshProto::nodeIdString(c->key.peer);
+        Serial.printf("%u %s msgs=%u unread=%d title=\"%s\"\n", static_cast<unsigned>(i), where.c_str(),
                       static_cast<unsigned>(c->messages.size()), c->unread, Chat::title(*c).c_str());
     }
 }
