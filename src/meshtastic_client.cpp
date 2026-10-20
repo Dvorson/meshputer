@@ -1,10 +1,10 @@
 #include "meshtastic_client.h"
 
-#include <NimBLEDevice.h>
 #include <esp_random.h>
 
 #include <algorithm>
 
+#include "ble_link.h"
 #include "log.h"
 #include "settings.h"
 
@@ -12,13 +12,8 @@ MeshtasticClient gMesh;
 
 namespace {
 
-const NimBLEUUID kServiceUuid("6ba1b218-15a8-461f-9fa8-5dcae273eafd");
-const NimBLEUUID kToRadioUuid("f75c76d2-129e-4dad-a1dd-7866124401e7");
-const NimBLEUUID kFromRadioUuid("2c55e69e-4993-11ed-b878-0242ac120002");
-const NimBLEUUID kFromNumUuid("ed9da18c-a800-4f66-a670-aa7547e34453");
-
 constexpr uint32_t kScanMs = 10000;
-constexpr uint32_t kConnectTimeoutMs = 8000;
+constexpr uint32_t kConnectTimeoutMs = 12000;  // backstop; the BLE stack times out first
 constexpr uint32_t kSecureTimeoutMs = 15000;
 constexpr uint32_t kPairingTimeoutMs = 90000;
 constexpr uint32_t kSyncTimeoutMs = 60000;
@@ -32,44 +27,8 @@ constexpr size_t kMaxEvents = 32;
 constexpr size_t kMaxNodes = 150;
 constexpr size_t kMaxScanResults = 20;
 
-// Connection interval in 1.25 ms units: fast while downloading the node
-// database, slow once synced so the radio wakes ~7x/s instead of ~40x/s.
-constexpr uint16_t kFastIntervalMin = 12;   // 15 ms
-constexpr uint16_t kFastIntervalMax = 24;   // 30 ms
-constexpr uint16_t kSlowIntervalMin = 96;   // 120 ms
-constexpr uint16_t kSlowIntervalMax = 128;  // 160 ms
-constexpr uint16_t kSupervisionTimeout = 600;  // 6 s, in 10 ms units
-
-NimBLEClient* sClient = nullptr;
-NimBLERemoteCharacteristic* sToRadio = nullptr;
-NimBLERemoteCharacteristic* sFromRadio = nullptr;
-NimBLERemoteCharacteristic* sFromNum = nullptr;
 bool sBondRetried = false;
 
-class ClientCallbacks : public NimBLEClientCallbacks {
-    void onConnect(NimBLEClient*) override { gMesh.bleConnected(); }
-    void onConnectFail(NimBLEClient*, int reason) override { gMesh.bleConnectFailed(reason); }
-    void onDisconnect(NimBLEClient*, int reason) override { gMesh.bleDisconnected(reason); }
-    void onPassKeyEntry(NimBLEConnInfo& info) override { gMesh.blePasskeyRequested(info.getConnHandle()); }
-    void onAuthenticationComplete(NimBLEConnInfo& info) override { gMesh.bleAuthComplete(info.isEncrypted()); }
-    bool onConnParamsUpdateRequest(NimBLEClient*, const ble_gap_upd_params*) override { return true; }
-};
-
-class ScanCallbacks : public NimBLEScanCallbacks {
-    void onResult(const NimBLEAdvertisedDevice* dev) override {
-        if (!dev->isAdvertisingService(kServiceUuid)) return;
-        RadioInfo r;
-        r.name = dev->getName();
-        r.addr = dev->getAddress().toString();
-        r.addrType = dev->getAddress().getType();
-        r.rssi = dev->getRSSI();
-        gMesh.bleScanResult(r);
-    }
-    void onScanEnd(const NimBLEScanResults&, int) override { gMesh.bleScanEnded(); }
-};
-
-ClientCallbacks sClientCallbacks;
-ScanCallbacks sScanCallbacks;
 
 uint32_t newPacketId() {
     uint32_t id = esp_random();
@@ -115,17 +74,11 @@ void MeshtasticClient::setState(LinkState s) {
 
 bool MeshtasticClient::bleUp() {
     if (_bleUp) return true;
-    if (!NimBLEDevice::init("Meshputer")) {
+    if (!BleLink::up()) {
         _status = "Bluetooth failed to start";
-        LOG("MESH", "NimBLE init failed");
+        LOG("MESH", "bluetooth init failed");
         return false;
     }
-    NimBLEDevice::setMTU(517);
-    NimBLEDevice::setSecurityAuth(true, true, true);
-    NimBLEDevice::setSecurityIOCap(BLE_HS_IO_KEYBOARD_ONLY);
-    sClient = NimBLEDevice::createClient();
-    sClient->setClientCallbacks(&sClientCallbacks, false);
-    sClient->setConnectTimeout(kConnectTimeoutMs);
     _bleUp = true;
     LOG("MESH", "bluetooth on");
     setState(LinkState::Idle);
@@ -134,9 +87,7 @@ bool MeshtasticClient::bleUp() {
 
 void MeshtasticClient::bleDown() {
     if (!_bleUp) return;
-    NimBLEDevice::deinit(true);
-    sClient = nullptr;
-    sToRadio = sFromRadio = sFromNum = nullptr;
+    BleLink::down();
     _bleUp = false;
     _flagConnected = false;
     _flagConnectFail = 0;
@@ -172,7 +123,7 @@ void MeshtasticClient::loop() {
         break;
 
     case LinkState::Connecting:
-        // NimBLE reports a timeout itself; this is a backstop.
+        // The BLE stack reports a timeout itself; this is a backstop.
         if (now - _stateSince > kConnectTimeoutMs + 4000) dropLink("Connect timed out", true);
         break;
 
@@ -213,7 +164,7 @@ void MeshtasticClient::processBleFlags() {
         _syncStep = SyncStep::Securing;
         _status = "Securing link";
         setState(LinkState::Syncing);
-        if (!sClient->secureConnection(true)) LOG("MESH", "secureConnection did not start");
+        BleLink::secure();
     }
 
     int fail = _flagConnectFail.exchange(0);
@@ -232,14 +183,18 @@ void MeshtasticClient::processBleFlags() {
         if (!discoverAndRequestConfig()) dropLink(_status, syncFailureIsTransient());
     } else if (auth == -1 && linked) {
         _flagDisconnected = 0;
-        NimBLEAddress addr(_radio.addr, _radio.addrType);
-        bool hadBond = NimBLEDevice::isBonded(addr);
-        NimBLEDevice::deleteBond(addr);
+        bool hadBond = BleLink::isBonded(_radio.addr, _radio.addrType);
+        BleLink::deleteBond(_radio.addr, _radio.addrType);
         if (hadBond && !sBondRetried) {
             // The radio forgot us (reflashed or reset): pair again from scratch.
             sBondRetried = true;
             dropLink("Old pairing rejected, pairing again", false);
             _reconnectAt = millis() + 1000;
+        } else if (!BleLink::interactivePin()) {
+            // This stack takes the PIN up front: ask for it, then reconnect.
+            dropLink("Wrong PIN? Enter the radio's PIN", false);
+            _status = "Enter the radio's PIN";
+            setState(LinkState::Pairing);
         } else {
             dropLink("Pairing failed - check the PIN", false);
         }
@@ -248,7 +203,6 @@ void MeshtasticClient::processBleFlags() {
     int reason = _flagDisconnected.exchange(0);
     if (reason != 0 && (_state == LinkState::Connecting || _state == LinkState::Pairing ||
                         _state == LinkState::Syncing || _state == LinkState::Ready)) {
-        sToRadio = sFromRadio = sFromNum = nullptr;
         dropLink("Link lost (" + std::to_string(reason) + ")", true);
     }
 
@@ -282,16 +236,17 @@ uint32_t MeshtasticClient::reconnectInMs() const {
 void MeshtasticClient::startConnect() {
     _reconnectAt = 0;
     if (_radio.addr.empty() || !bleUp()) return;
-    if (_state == LinkState::Scanning) NimBLEDevice::getScan()->stop();
+    if (_state == LinkState::Scanning) BleLink::stopScan();
 
     _flagDisconnected = 0;  // anything pending belongs to the previous link
     _flagPasskey = false;
     _flagAuth = 0;
-    NimBLEAddress addr(_radio.addr, _radio.addrType);
+    if (!BleLink::interactivePin()) {
+        BleLink::setPin(static_cast<uint32_t>(strtoul(Settings::get().blePin.c_str(), nullptr, 10)));
+    }
     _status = "Connecting to " + (_radio.name.empty() ? _radio.addr : _radio.name);
     setState(LinkState::Connecting);
-    sClient->setConnectionParams(kFastIntervalMin, kFastIntervalMax, 0, kSupervisionTimeout);
-    if (!sClient->connect(addr, true, true, true)) {
+    if (!BleLink::connect(_radio.addr, _radio.addrType)) {
         dropLink("Connect failed to start", true);
     }
 }
@@ -299,11 +254,10 @@ void MeshtasticClient::startConnect() {
 void MeshtasticClient::dropLink(const std::string& why, bool allowRetry) {
     _status = why;
     LOG("MESH", "drop link: %s", why.c_str());
-    if (sClient && (sClient->isConnected() || _state == LinkState::Connecting)) {
-        if (sClient->isConnected()) sClient->disconnect();
-        else sClient->cancelConnect();
+    if (_bleUp) {
+        if (BleLink::isConnected()) BleLink::disconnect();
+        else if (_state == LinkState::Connecting) BleLink::cancelConnect();
     }
-    sToRadio = sFromRadio = sFromNum = nullptr;
     _pinHandle = 0xFFFF;
     if (_ownerUpdate == OwnerUpdate::Working) {
         _ownerUpdate = OwnerUpdate::Failed;
@@ -383,7 +337,7 @@ void MeshtasticClient::disconnect() {
 void MeshtasticClient::forgetRadio() {
     disconnect();
     if (!_radio.addr.empty() && bleUp()) {
-        NimBLEDevice::deleteBond(NimBLEAddress(_radio.addr, _radio.addrType));
+        BleLink::deleteBond(_radio.addr, _radio.addrType);
     }
     Settings& s = Settings::get();
     s.radioAddr.clear();
@@ -397,9 +351,8 @@ void MeshtasticClient::forgetRadio() {
 }
 
 void MeshtasticClient::submitPin(uint32_t pin) {
-    if (_state != LinkState::Pairing || !sClient) return;
-    NimBLEConnInfo info = sClient->getConnInfo();
-    if (!NimBLEDevice::injectPassKey(info, pin)) {
+    if (_state != LinkState::Pairing) return;
+    if (BleLink::interactivePin() && !BleLink::submitPin(pin)) {
         dropLink("Could not send PIN", false);
         return;
     }
@@ -409,6 +362,12 @@ void MeshtasticClient::submitPin(uint32_t pin) {
     if (s.blePin != buf) {
         s.blePin = buf;
         s.save();
+    }
+    if (!BleLink::interactivePin()) {
+        setState(_bleUp ? LinkState::Idle : LinkState::Off);
+        sBondRetried = true;
+        startConnect();  // reconnects using the PIN just saved
+        return;
     }
     _syncStep = SyncStep::Securing;
     _status = "Checking PIN";
@@ -428,13 +387,7 @@ void MeshtasticClient::startScan() {
         std::lock_guard<std::mutex> lock(_scanMutex);
         _scan.clear();
     }
-    NimBLEScan* scan = NimBLEDevice::getScan();
-    scan->setScanCallbacks(&sScanCallbacks, false);
-    scan->setActiveScan(true);   // radios put their name in the scan response
-    scan->setInterval(100);
-    scan->setWindow(60);
-    scan->setDuplicateFilter(false);
-    if (!scan->start(kScanMs, false, true)) {
+    if (!BleLink::startScan(kScanMs)) {
         _status = "Scan failed to start";
         return;
     }
@@ -443,7 +396,7 @@ void MeshtasticClient::startScan() {
 }
 
 void MeshtasticClient::stopScan() {
-    if (_bleUp) NimBLEDevice::getScan()->stop();
+    if (_bleUp) BleLink::stopScan();
     if (_state == LinkState::Scanning) setState(LinkState::Idle);
 }
 
@@ -454,7 +407,7 @@ std::vector<RadioInfo> MeshtasticClient::scanResults() const {
     return out;
 }
 
-// ---- NimBLE callbacks (host task) ----------------------------------------
+// ---- BLE stack callbacks (BLE host task) ---------------------------------
 
 void MeshtasticClient::bleConnected() { _flagConnected = true; }
 void MeshtasticClient::bleConnectFailed(int reason) { _flagConnectFail = reason != 0 ? reason : -1; }
@@ -479,22 +432,9 @@ void MeshtasticClient::bleScanResult(const RadioInfo& r) {
 // ---- sync and frames -------------------------------------------------------
 
 bool MeshtasticClient::discoverAndRequestConfig() {
-    NimBLERemoteService* svc = sClient ? sClient->getService(kServiceUuid) : nullptr;
-    if (!svc) {
+    if (!BleLink::findMeshService()) {
         _status = "Not a Meshtastic radio";
         return false;
-    }
-    sToRadio = svc->getCharacteristic(kToRadioUuid);
-    sFromRadio = svc->getCharacteristic(kFromRadioUuid);
-    sFromNum = svc->getCharacteristic(kFromNumUuid);
-    if (!sToRadio || !sFromRadio || !sFromNum) {
-        _status = "Radio is missing mesh characteristics";
-        return false;
-    }
-    if (sFromNum->canNotify()) {
-        sFromNum->subscribe(true, [](NimBLERemoteCharacteristic*, uint8_t*, size_t, bool) {
-            gMesh.bleFromNum();
-        }, true);
     }
 
     // 69420 / 69421 ask for partial dumps; anything else means "everything".
@@ -513,16 +453,16 @@ bool MeshtasticClient::discoverAndRequestConfig() {
 }
 
 void MeshtasticClient::pullFrames(int maxFrames) {
-    if (!sFromRadio || !sClient || !sClient->isConnected()) return;
+    if (!BleLink::isConnected()) return;
     // Each read costs a BLE round trip; cap the time so keys stay responsive.
     constexpr uint32_t kPullBudgetMs = 120;
     uint32_t start = millis();
     _lastPollMs = start;
     for (int i = 0; i < maxFrames && (i == 0 || millis() - start < kPullBudgetMs); ++i) {
-        NimBLEAttValue v = sFromRadio->readValue();
-        if (v.size() == 0) return;
-        handleFrame(v.data(), v.size());
-        if (!sFromRadio) return;  // link dropped while handling
+        std::string frame;
+        if (!BleLink::read(frame)) return;
+        handleFrame(reinterpret_cast<const uint8_t*>(frame.data()), frame.size());
+        if (!BleLink::isConnected()) return;  // link dropped while handling
     }
     _flagPull = true;  // maybe more queued; continue next loop
 }
@@ -698,7 +638,7 @@ void MeshtasticClient::becomeReady() {
     setState(LinkState::Ready);
 
     // Synced: drop to a slow connection interval to save power.
-    if (sClient) sClient->updateConnParams(kSlowIntervalMin, kSlowIntervalMax, 0, kSupervisionTimeout);
+    BleLink::setSlowInterval();
 
     Settings& s = Settings::get();
     if (s.radioAddr != _radio.addr || s.radioAddrType != _radio.addrType ||
@@ -714,8 +654,7 @@ void MeshtasticClient::becomeReady() {
 }
 
 bool MeshtasticClient::writeToRadio(const uint8_t* buf, size_t len) {
-    if (!sToRadio || len == 0) return false;
-    return sToRadio->writeValue(buf, len, true);
+    return BleLink::write(buf, len);
 }
 
 // ---- messaging ---------------------------------------------------------------

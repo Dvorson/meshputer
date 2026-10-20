@@ -1,3 +1,6 @@
+// Board layer for the M5Stack Cardputer / Cardputer ADV (ESP32-S3).
+#if !defined(MESHPUTER_BOARD_TAB5)
+
 #include "board.h"
 
 #include <M5Cardputer.h>
@@ -238,3 +241,5 @@ bool listDir(const char* path, std::vector<std::string>& names) {
 }
 
 } // namespace Board
+
+#endif

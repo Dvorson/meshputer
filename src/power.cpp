@@ -45,7 +45,9 @@ void setScreen(Screen s) {
 namespace Power {
 
 void begin() {
-    setCpuFrequencyMhz(kCpuMhz);
+#if !defined(MESHPUTER_BOARD_TAB5)
+    setCpuFrequencyMhz(kCpuMhz);  // the Tab5's P4 keeps its own clock plan
+#endif
     Board::setBacklight(Settings::get().brightness);
     sLastActivity = millis();
     LOG("PWR", "cpu %lu MHz", static_cast<unsigned long>(getCpuFrequencyMhz()));

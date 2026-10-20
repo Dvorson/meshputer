@@ -1,6 +1,7 @@
 #include "debug_console.h"
 
 #include <Arduino.h>
+#include <esp_system.h>
 #include <cstdlib>
 #include <deque>
 #include <string>
@@ -77,6 +78,8 @@ void printStatus() {
     Serial.printf("owner_update=%d \"%s\"\n", static_cast<int>(gMesh.ownerUpdate()), gMesh.ownerMessage().c_str());
     Serial.printf("convs=%u unread=%d screen=%s\n", static_cast<unsigned>(Chat::store().size()),
                   Chat::store().unreadCount(), Nav::current() ? Nav::current()->name() : "-");
+    Serial.printf("uptime=%lus reset_reason=%d\n", static_cast<unsigned long>(millis() / 1000),
+                  static_cast<int>(esp_reset_reason()));
     Serial.printf("heap=%lu min_heap=%lu cpu=%luMHz screen_on=%d battery=%d sd=%d\n",
                   static_cast<unsigned long>(ESP.getFreeHeap()), static_cast<unsigned long>(ESP.getMinFreeHeap()),
                   static_cast<unsigned long>(getCpuFrequencyMhz()), Power::screenOn(), Board::batteryPercent(),

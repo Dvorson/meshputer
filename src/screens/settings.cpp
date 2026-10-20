@@ -165,7 +165,7 @@ void SettingsScreen::key(const KeyInput& k) {
     }
     if (k.del || k.esc()) { Nav::pop(); return; }
     if (_list.move(k, kRowCount)) invalidate();
-    if (k.enter) {
+    if (k.enter || _list.tapped(k, kRowCount)) {
         activate(_list.sel);
         invalidate();
     }

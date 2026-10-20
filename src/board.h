@@ -15,6 +15,7 @@ struct KeyInput {
     bool fn = false;
     bool tab = false;
     std::vector<char> chars;  // printable characters, already shifted
+    int tapRow = -1;          // touch screens: content row tapped (list screens open it)
 
     bool has(char c) const {
         for (char k : chars) if (k == c) return true;

@@ -68,7 +68,7 @@ void NodesScreen::key(const KeyInput& k) {
     if (k.has('i') || k.right()) {
         gNodeInfoScreen.open(num);
         Nav::push(&gNodeInfoScreen);
-    } else if (k.enter) {
+    } else if (k.enter || _list.tapped(k, static_cast<int>(_nodes.size()))) {
         openChat(Chat::openDirect(num));
     }
 }
@@ -175,7 +175,8 @@ void ChannelsScreen::key(const KeyInput& k) {
     if (k.del || k.esc()) { Nav::pop(); return; }
     std::vector<uint8_t> chans = active();
     if (_list.move(k, static_cast<int>(chans.size()))) invalidate();
-    if (k.enter && !chans.empty()) openChat(Chat::openChannel(chans[_list.sel]));
+    bool open = k.enter || _list.tapped(k, static_cast<int>(chans.size()));
+    if (open && !chans.empty()) openChat(Chat::openChannel(chans[_list.sel]));
 }
 
 void ChannelsScreen::draw(M5Canvas& c) {
