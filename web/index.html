@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Meshputer — Meshtastic messenger for the Cardputer</title>
-<meta name="description" content="Turn an M5Stack Cardputer into a pocket Meshtastic messenger. Pairs over Bluetooth with the radio you already own. Install from the browser.">
+<title>Meshputer — Meshtastic messenger for the Cardputer and Tab5</title>
+<meta name="description" content="Turn an M5Stack Cardputer or Tab5 into a Meshtastic messenger. Pairs over Bluetooth with the radio you already own. Install from the browser.">
 <meta property="og:title" content="Meshputer">
-<meta property="og:description" content="A pocket Meshtastic messenger for the M5Stack Cardputer. Install from your browser.">
+<meta property="og:description" content="A Meshtastic messenger for the M5Stack Cardputer and Tab5. Install from your browser.">
 <meta property="og:image" content="screens/chat.png">
 <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
 <style>
@@ -57,16 +57,16 @@
   <section class="hero">
     <div>
       <h1>MESH<span>PUTER</span></h1>
-      <p class="lede">A pocket Meshtastic messenger for the M5Stack Cardputer.</p>
-      <p class="sub">Pair it over Bluetooth with the Meshtastic radio you already own and chat over LoRa from a real keyboard. No phone, no Wi-Fi, no extra radio hardware.</p>
+      <p class="lede">A Meshtastic messenger for the M5Stack Cardputer and Tab5.</p>
+      <p class="sub">Pair it over Bluetooth with the Meshtastic radio you already own and chat over LoRa from a real keyboard or the Tab5's touch screen. No phone, no Wi-Fi, no extra radio hardware.</p>
       <div class="install">
         <esp-web-install-button manifest="manifest.json">
           <button slot="activate">Install Meshputer {{VERSION}}</button>
           <span slot="unsupported" class="warn">Your browser can't flash devices. Use desktop Chrome or Edge.</span>
           <span slot="not-allowed" class="warn">Open this page over HTTPS to install.</span>
         </esp-web-install-button>
-        <p>Plug the Cardputer in with a USB-C data cable, press Install, pick the serial port.
-           Updating keeps your paired radio and settings.</p>
+        <p>Plug the Cardputer or Tab5 in with a USB-C data cable, press Install, pick the serial port;
+           the right firmware is chosen for the device. Updating keeps your paired radio and settings.</p>
       </div>
     </div>
     <div class="device"><img src="screens/chat.png" alt="Chat between two Cardputers on the Meshputer screen" width="720" height="405"></div>
@@ -74,7 +74,7 @@
 
   <h2>What you need</h2>
   <ol>
-    <li>An <b>M5Stack Cardputer</b> (v1.1) or <b>Cardputer ADV</b>.</li>
+    <li>An <b>M5Stack Cardputer</b> (v1.1), <b>Cardputer ADV</b> or <b>Tab5</b>.</li>
     <li>Any <b>Meshtastic radio with Bluetooth</b> — Heltec, T-Beam, RAK, T-Echo, Station G2… running stock firmware.</li>
     <li>Its Bluetooth PIN (default <code>123456</code>; radios with a screen show it).</li>
   </ol>
@@ -85,6 +85,7 @@
     <div class="card"><b>Chat</b><span>Direct messages and channels, with sent / relayed / delivered ticks.</span></div>
     <div class="card"><b>Identity</b><span>See who anyone is — name, hardware, hops, signal, encryption. Edit your own name.</span></div>
     <div class="card"><b>History</b><span>Conversations saved to the SD card, per radio.</span></div>
+    <div class="card"><b>Tab5 touch UI</b><span>Its own layout for the 5" screen: side by side in landscape, one page at a time in portrait, turning with the device.</span></div>
     <div class="card"><b>Emoji</b><span>Picker sends real emoji, so phones see them too. Quick replies built in.</span></div>
     <div class="card"><b>Battery first</b><span>80 MHz CPU, Wi-Fi off unless you turn Internet on, Bluetooth only when needed, screen sleeps.</span></div>
   </div>
@@ -95,11 +96,15 @@
     <img src="screens/nodes.png" alt="Nodes heard on the mesh" loading="lazy" width="720" height="405">
     <img src="screens/identity.png" alt="Identity of another node" loading="lazy" width="720" height="405">
     <img src="screens/settings.png" alt="Settings" loading="lazy" width="720" height="405">
+    <img src="screens/tab5-chat-landscape.png" alt="Tab5 in landscape: chats beside the conversation" loading="lazy" width="640" height="360">
+    <img src="screens/tab5-node-landscape.png" alt="Tab5 in landscape: a node's identity" loading="lazy" width="640" height="360">
   </div>
 
   <h2>Other ways to install</h2>
-  <p>Download the <a href="firmware/meshputer-merged.bin">single image</a> ({{VERSION}}) for M5Burner, M5Launcher (as full firmware) or esptool:</p>
-  <pre>esptool.py --chip esp32s3 write_flash 0x0 meshputer-merged.bin</pre>
+  <p>Download the single image ({{VERSION}}) for the <a href="firmware/meshputer-cardputer.bin">Cardputer</a> or the
+     <a href="firmware/meshputer-tab5.bin">Tab5</a> for M5Burner, M5Launcher (as full firmware) or esptool:</p>
+  <pre>esptool.py --chip esp32s3 write_flash 0x0 meshputer-cardputer.bin
+esptool.py --chip esp32p4 write_flash 0x0 meshputer-tab5.bin</pre>
   <p class="sub">The single image resets saved settings; the browser installer above keeps them.</p>
 
   <footer>
