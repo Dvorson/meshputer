@@ -1,14 +1,15 @@
 <h1 align="center">Meshputer</h1>
 
 <p align="center">
-  <b>A pocket Meshtastic messenger for the M5Stack Cardputer.</b><br>
-  Pair it over Bluetooth with the Meshtastic radio you already own and chat over LoRa from a real keyboard.
+  <b>A Meshtastic messenger for the M5Stack Cardputer and Tab5.</b><br>
+  Pair it over Bluetooth with the Meshtastic radio you already own and chat over LoRa from a real keyboard or a touch screen.
 </p>
 
 <p align="center">
   <a href="https://dvorson.github.io/meshputer/"><b>⚡ Install from your browser</b></a> ·
   <a href="https://github.com/Dvorson/meshputer/releases/latest">Download</a> ·
   <a href="#using-it">Keys</a> ·
+  <a href="#tab5">Tab5</a> ·
   <a href="#development">Hack on it</a>
 </p>
 
@@ -23,11 +24,12 @@
 ## Why
 
 Meshtastic radios are great, but you normally drive them from a phone. Meshputer
-turns a Cardputer into the radio's keyboard and screen instead:
+turns a Cardputer or a Tab5 into the radio's keyboard and screen instead:
 
 - **Works with the radio you have.** Heltec, T-Beam, RAK, T-Echo, Station G2… any
   Meshtastic node with Bluetooth, on stock firmware. No LoRa add-on needed.
-- **Works on both Cardputers.** Original Cardputer (v1.1) and Cardputer ADV.
+- **Works on both Cardputers and the Tab5.** Original Cardputer (v1.1) and
+  Cardputer ADV with their keyboards; the Tab5 with a touch UI of its own.
 - **Leaves the phone at home.** A pocket messenger with a physical keyboard.
 
 Already have a Cardputer ADV with the Cap LoRa-1262? You can also run a full node
@@ -52,27 +54,55 @@ radio on your belt or backpack, and the Cardputer in your hand.
   <img src="docs/screens/settings.png" width="49%" alt="Settings, including your own name">
 </p>
 
+## Tab5
+
+On the M5Stack Tab5 Meshputer has a touch UI of its own, built with LVGL and
+designed for the 5" screen rather than scaled up from the Cardputer:
+
+- **Turns with the device.** Hold it sideways for chats, nodes and settings side by
+  side with a navigation rail; upright for one page at a time with a bottom bar.
+  (Settings → Display can pin it to portrait or landscape.)
+- **Chats** for DMs, channels and internet DMs, with an on-screen keyboard that
+  docks under the conversation and quick replies one tap away.
+- **Nodes** with each node's identity and signal and a *Message* button;
+  **Radio** to scan, pair (PIN keypad) and connect; **Settings** for your name,
+  internet chats with a QR code of the device's Nostr identity, display and sound.
+- History is kept on the microSD card, or in internal flash when there is none.
+
+<p align="center">
+  <img src="docs/screens/tab5-chat-landscape.png" width="64%" alt="Tab5 in landscape: chats beside the conversation">
+  <img src="docs/screens/tab5-chat-portrait.png" width="34%" alt="Tab5 in portrait: a conversation">
+</p>
+
+The Tab5's Wi-Fi and Bluetooth radio is an ESP32-C6 reached over SDIO, so it runs
+the arduino-esp32 Bluetooth stack; the Cardputer keeps NimBLE.
+
 ## Install
 
 **Browser (recommended):** open **[dvorson.github.io/meshputer](https://dvorson.github.io/meshputer/)**
-in desktop Chrome or Edge, plug the Cardputer in, press *Install*. Updates keep your
-paired radio and settings.
+in desktop Chrome or Edge, plug the Cardputer or Tab5 in, press *Install*; it picks
+the right firmware for the device. Updates keep your paired radio and settings.
 
-**Single image:** grab `meshputer-<version>.bin` from
+**Single image:** grab `meshputer-cardputer-<version>.bin` or
+`meshputer-tab5-<version>.bin` from
 [Releases](https://github.com/Dvorson/meshputer/releases/latest) for M5Burner,
 M5Launcher (as full firmware) or esptool:
 
 ```bash
-esptool.py --chip esp32s3 write_flash 0x0 meshputer-v0.1.0.bin
+esptool.py --chip esp32s3 write_flash 0x0 meshputer-cardputer-v0.3.0.bin
+esptool.py --chip esp32p4 write_flash 0x0 meshputer-tab5-v0.3.0.bin
 ```
 
 **From source:** see [Development](#development).
 
-Then on the Cardputer: **Enter** on *Connect a radio*, pick yours, type its PIN
+Then on the Tab5: *Radio* → *Scan*, tap your radio, and type its PIN if asked.
+On the Cardputer: **Enter** on *Connect a radio*, pick yours, type its PIN
 (pre-filled with Meshtastic's default `123456`; radios with a screen show a random
 one). Close the phone app first: a radio talks to one Bluetooth client at a time.
 
 ## Using it
+
+On the Cardputer:
 
 | Where | Keys |
 |---|---|
@@ -122,7 +152,7 @@ Needs [uv](https://docs.astral.sh/uv/).
 make setup      # PlatformIO + tool deps
 make test       # native unit tests (protocol, conversations, text, Nostr) — no device needed
 make interop    # Nostr DMs cross-checked against rust-nostr, both directions
-make flash      # build + flash over USB
+make flash      # build + flash over USB (BOARD=tab5 for the Tab5)
 make logs       # stream device logs
 ```
 
@@ -131,31 +161,36 @@ The firmware exposes a serial console, so you can drive and inspect a device fro
 ```bash
 make console CMD='status nodes'
 make console CMD='"send !a1b2c3d4 hello" "owner ANA Ana Cardputer"'
-make shot OUT=screen.png        # what's on the display, as PNG
-make screenshots                # regenerate docs/screens on demo data (RAM only)
+make shot OUT=screen.png        # what's on the display, as PNG (Tab5: STEP=2 for half size)
+make screenshots                # regenerate docs/screens on demo data (RAM only; BOARD=tab5)
 ```
 
 `help` lists every command (`scan`, `connect`, `pin`, `nodes`, `node`, `send`,
-`owner`, `key` to inject key presses, `shot`, …). Each ends with `## done` or `## error <why>`.
+`owner`, `key` to inject key presses, `tap`/`swipe`/`rotate` on the Tab5, `shot`, …).
+Each ends with `## done` or `## error <why>`.
 
 ```
 src/core/       portable C++ (no Arduino): Meshtastic protobuf framing,
                 conversation model + SD format, UTF-8/emoji text — unit tested
-src/            device layer: BLE client, chat service, power, board, UI
-src/screens/    screens and navigation
+src/            device layer: BLE client (NimBLE or arduino-esp32 stack behind
+                ble_link.h), chat service, Nostr, power, boards
+src/screens/    Cardputer: keyboard screens and navigation
+src/tab5/       Tab5: LVGL touch UI (shell, views, display/touch/IMU port)
 tests/          native tests for src/core, against the real nanopb schema
 tools/          serial console/screenshot tool, release + installer-site builders
 web/            browser-installer page (GitHub Pages)
 ```
 
-Releases: push a `v*` tag; CI builds, attaches the image to a GitHub Release and
-publishes the installer to Pages (`make site` + `make serve` to preview locally).
+Releases: push a `v*` tag; CI builds both boards, attaches their images to a GitHub
+Release and publishes the installer to Pages (`make site` + `make serve` to preview locally).
 
 ### Notes
 
 - Uploads use `--no-stub`: esptool's RAM stub is unreliable over the S3's USB-JTAG port.
 - Opening the serial port with RTS asserted and DTR released resets the ESP32-S3; the tool keeps DTR asserted.
-- History lives in `/meshputer/<node id>/` on the SD card, one text file per conversation.
+- History lives in `/meshputer/<node id>/` on the SD card, one text file per conversation
+  (Tab5 without a card: the same layout in internal flash).
+- Tab5 text uses LVGL's built-in Latin fonts, so emoji show as `:codes:` as on the Cardputer.
 - If a radio was reflashed and refuses the old pairing, Meshputer drops the bond and pairs again; *Forget radio* does it by hand.
 
 ## License

@@ -71,9 +71,6 @@ struct ListView {
     // Handles up/down; returns true if the selection moved.
     bool move(const KeyInput& k, int count, int rows = Layout::ROWS);
     void clamp(int count, int rows = Layout::ROWS);
-    // Touch: if a visible row was tapped, select it and return true (= Enter).
-    // rowOffset: content rows above the list (e.g. info lines).
-    bool tapped(const KeyInput& k, int count, int rows = Layout::ROWS, int rowOffset = 0);
     bool visible(int i, int rows = Layout::ROWS) const { return i >= top && i < top + rows; }
 };
 

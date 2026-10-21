@@ -3,9 +3,10 @@
 #include <Arduino.h>
 #include <esp_system.h>
 #include <cstdlib>
-#include <deque>
 #include <string>
 
+#include "app_ui.h"
+#include "board.h"
 #include "chat_service.h"
 #include "core/text_util.h"
 #include "log.h"
@@ -14,13 +15,11 @@
 #include "meshtastic_client.h"
 #include "nostr_service.h"
 #include "power.h"
-#include "screens/screens.h"
 #include "settings.h"
 
 namespace {
 
 std::string sLine;
-std::deque<KeyInput> sKeys;
 
 void done() { Serial.println("## done"); }
 void fail(const char* why) { Serial.printf("## error %s\n", why); }
@@ -56,8 +55,10 @@ void printHelp() {
         "send <!id|chN> <text>      send text (DM or channel)\n"
         "owner <short> <long name>  set this radio's identity\n"
         "key <text>|enter|del|esc|up|down|left|right|fn+<c>   inject keys\n"
-        "screen / shot              current screen / dump the frame (RGB565 hex)\n"
-        "open home|nodes|channels|settings|radio|chat <n>|node <!id>   jump to a screen\n"
+        "tap <x> <y> / swipe <x1> <y1> <x2> <y2>   touch input (touch screens)\n"
+        "rotate <0-3>|auto          draw the UI turned (touch screens)\n"
+        "screen / shot [step]       current screen / dump the frame (RGB565 hex)\n"
+        "open home|chats|nodes|channels|settings|radio|chat <n>|node <!id>   jump to a screen\n"
         "demo                       fictional nodes + chats for screenshots (RAM only)\n"
         "internet on|off            Wi-Fi + Nostr relays\n"
         "wifi <ssid> [password]     set the Wi-Fi network (stored on the device)\n"
@@ -77,7 +78,7 @@ void printStatus() {
                   static_cast<unsigned>(gMesh.nodes().size()), static_cast<unsigned>(gMesh.channels().size()));
     Serial.printf("owner_update=%d \"%s\"\n", static_cast<int>(gMesh.ownerUpdate()), gMesh.ownerMessage().c_str());
     Serial.printf("convs=%u unread=%d screen=%s\n", static_cast<unsigned>(Chat::store().size()),
-                  Chat::store().unreadCount(), Nav::current() ? Nav::current()->name() : "-");
+                  Chat::store().unreadCount(), AppUi::screenName());
     Serial.printf("uptime=%lus reset_reason=%d\n", static_cast<unsigned long>(millis() / 1000),
                   static_cast<int>(esp_reset_reason()));
     Serial.printf("heap=%lu min_heap=%lu cpu=%luMHz screen_on=%d battery=%d sd=%d\n",
@@ -129,50 +130,6 @@ void printMsgs(int idx) {
                       m.fromMe ? deliveryLabel(m.delivery) : "rx", m.text.c_str());
     }
     done();
-}
-
-void injectKey(const std::string& spec) {
-    KeyInput k;
-    k.any = true;
-    if (spec == "enter") k.enter = true;
-    else if (spec == "del") k.del = true;
-    else if (spec == "esc") k.chars.push_back('`');
-    else if (spec == "up") k.chars.push_back(';');
-    else if (spec == "down") k.chars.push_back('.');
-    else if (spec == "left") k.chars.push_back(',');
-    else if (spec == "right") k.chars.push_back('/');
-    else if (spec.size() == 4 && spec.compare(0, 3, "fn+") == 0) { k.fn = true; k.chars.push_back(spec[3]); }
-    else {
-        // Literal text: one key event per character, like typing.
-        for (char ch : spec) {
-            KeyInput t;
-            t.any = true;
-            t.chars.push_back(ch);
-            sKeys.push_back(t);
-        }
-        return;
-    }
-    sKeys.push_back(k);
-}
-
-void dumpFrame() {
-    M5Canvas& c = Board::canvas();
-    const uint8_t* buf = static_cast<const uint8_t*>(c.getBuffer());
-    int w = c.width(), h = c.height();
-    Serial.printf("SHOT %d %d rgb565be\n", w, h);
-    static char line[240 * 4 + 2];
-    for (int y = 0; y < h; ++y) {
-        const uint8_t* row = buf + static_cast<size_t>(y) * w * 2;
-        static const char* kHex = "0123456789abcdef";
-        int n = 0;
-        for (int i = 0; i < w * 2; ++i) {
-            line[n++] = kHex[row[i] >> 4];
-            line[n++] = kHex[row[i] & 0xF];
-        }
-        line[n] = '\0';
-        Serial.println(line);
-    }
-    Serial.println("SHOT END");
 }
 
 void run(const std::string& raw) {
@@ -245,33 +202,34 @@ void run(const std::string& raw) {
     }
     else if (cmd == "key") {
         if (rest.empty()) { fail("usage: key <text>|enter|..."); return; }
-        injectKey(rest);
-        done();
+        std::string err = AppUi::key(rest);
+        if (err.empty()) done(); else fail(err.c_str());
     }
     else if (cmd == "demo") {
         gMesh.loadDemoNodes();
         Chat::loadDemo();
-        Nav::reset(&gHomeScreen);
+        AppUi::home();
         done();
     }
     else if (cmd == "open") {
         std::string what = nextWord(rest);
-        if (what == "home") Nav::reset(&gHomeScreen);
-        else if (what == "nodes") Nav::push(&gNodesScreen);
-        else if (what == "channels") Nav::push(&gChannelsScreen);
-        else if (what == "settings") Nav::push(&gSettingsScreen);
-        else if (what == "radio") Nav::push(&gRadioScreen);
-        else if (what == "chat") {
-            int idx = atoi(rest.c_str());
-            if (!Chat::store().at(idx)) { fail("no such conversation"); return; }
-            openChat(idx);
-        } else if (what == "node") {
-            uint32_t num;
-            if (!parseNode(nextWord(rest), num)) { fail("bad node id"); return; }
-            gNodeInfoScreen.open(num);
-            Nav::push(&gNodeInfoScreen);
-        } else { fail("unknown screen"); return; }
-        done();
+        std::string err = AppUi::open(what, rest);
+        if (err.empty()) done(); else fail(err.c_str());
+    }
+    else if (cmd == "rotate") {
+        std::string err = AppUi::rotate(rest == "auto" || rest.empty() ? -1 : atoi(rest.c_str()));
+        if (err.empty()) done(); else fail(err.c_str());
+    }
+    else if (cmd == "tap" || cmd == "swipe") {
+        int v[4] = {0, 0, 0, 0};
+        int want = cmd == "tap" ? 2 : 4;
+        for (int i = 0; i < want; ++i) {
+            std::string w = nextWord(rest);
+            if (w.empty()) { fail("usage: tap <x> <y> | swipe <x1> <y1> <x2> <y2>"); return; }
+            v[i] = atoi(w.c_str());
+        }
+        std::string err = cmd == "tap" ? AppUi::tap(v[0], v[1]) : AppUi::swipe(v[0], v[1], v[2], v[3]);
+        if (err.empty()) done(); else fail(err.c_str());
     }
     else if (cmd == "internet") {
         NostrService::setEnabled(rest == "on");
@@ -316,8 +274,8 @@ void run(const std::string& raw) {
             fail("usage: nostr [dm <npub> <text> | publish]");
         }
     }
-    else if (cmd == "screen") { Serial.println(Nav::current() ? Nav::current()->name() : "-"); done(); }
-    else if (cmd == "shot") { dumpFrame(); done(); }
+    else if (cmd == "screen") { Serial.println(AppUi::screenName()); done(); }
+    else if (cmd == "shot") { AppUi::dumpFrame(rest.empty() ? 1 : atoi(rest.c_str())); done(); }
     else if (cmd == "reboot") { done(); Serial.flush(); ESP.restart(); }
     else fail("unknown command (try help)");
 }
@@ -338,13 +296,6 @@ void poll() {
             sLine += c;
         }
     }
-}
-
-bool popKey(KeyInput& out) {
-    if (sKeys.empty()) return false;
-    out = sKeys.front();
-    sKeys.pop_front();
-    return true;
 }
 
 } // namespace DebugConsole

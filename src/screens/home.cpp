@@ -134,7 +134,7 @@ void HomeScreen::key(const KeyInput& k) {
     if (k.has('c')) { Nav::push(&gChannelsScreen); return; }
     if (k.has('n')) { Nav::push(&gNodesScreen); return; }
     if (k.has('s')) { Nav::push(&gSettingsScreen); return; }
-    bool open = k.enter || _list.tapped(k, static_cast<int>(_entries.size()));
+    bool open = k.enter;
     if (!open || _entries.empty()) return;
 
     const Entry& e = _entries[_list.sel];

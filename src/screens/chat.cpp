@@ -211,7 +211,7 @@ void ChatScreen::draw(M5Canvas& c) {
 void CannedScreen::key(const KeyInput& k) {
     if (k.del || k.esc()) { Nav::pop(); return; }
     if (_list.move(k, kMaxCannedResponses)) invalidate();
-    if (k.enter || _list.tapped(k, kMaxCannedResponses)) {
+    if (k.enter) {
         const std::string& text = Settings::get().canned[_list.sel];
         if (text.empty()) return;
         Nav::pop();

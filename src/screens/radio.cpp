@@ -78,7 +78,7 @@ void RadioScreen::tick() {
 void RadioScreen::key(const KeyInput& k) {
     if (k.del || k.esc()) { Nav::pop(); return; }
     if (_list.move(k, static_cast<int>(_items.size()), kListRows)) invalidate();
-    bool open = k.enter || _list.tapped(k, static_cast<int>(_items.size()), kListRows, kInfoRows);
+    bool open = k.enter;
     if (!open || _items.empty()) return;
 
     const Item& item = _items[_list.sel];

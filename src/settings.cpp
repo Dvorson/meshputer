@@ -53,6 +53,7 @@ void Settings::load() {
     dimAfterSec = p.getUShort("dimSec", dimAfterSec);
     screenOffSec = p.getUShort("scrTmo", screenOffSec);
     themeIndex = p.getUChar("theme", themeIndex);
+    orientation = p.getUChar("orient", orientation);
     for (int i = 0; i < kMaxCannedResponses; ++i) {
         char key[8];
         cannedKey(key, sizeof(key), i);
@@ -80,6 +81,7 @@ void Settings::save() {
     p.putUShort("dimSec", dimAfterSec);
     p.putUShort("scrTmo", screenOffSec);
     p.putUChar("theme", themeIndex);
+    p.putUChar("orient", orientation);
     for (int i = 0; i < kMaxCannedResponses; ++i) {
         char key[8];
         cannedKey(key, sizeof(key), i);

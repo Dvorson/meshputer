@@ -32,7 +32,7 @@ def find_port():
     for p in list_ports.comports():
         if "usbmodem" in p.device:
             return p.device
-    sys.exit("No Cardputer found on USB; pass --port")
+    sys.exit("No Meshputer found on USB; pass --port")
 
 
 def open_port(port):
@@ -90,8 +90,9 @@ def write_png(path, width, height, rgb_rows):
         f.write(png)
 
 
-def shot(s, path, scale=1):
-    lines, ok = command(s, "shot", timeout=20, echo=False)
+def shot(s, path, scale=1, step=1):
+    # A Tab5 frame (720x1280) is ~3.7 MB of hex; --step 2 sends a quarter of it.
+    lines, ok = command(s, f"shot {step}", timeout=240, echo=False)
     if not ok or not lines or not lines[0].startswith("SHOT "):
         sys.exit("device did not return a frame")
     _, w, h, _fmt = lines[0].split()
@@ -114,26 +115,40 @@ def shot(s, path, scale=1):
 
 
 # Screens captured by `screenshots` (README / installer page), on demo data.
-SCREENS = [
-    ("home.png", ["open home"]),
-    ("chat.png", ["open chat 0"]),
-    ("identity.png", ["open home", "open node !1a2b3c4d"]),
-    ("nodes.png", ["open home", "open nodes"]),
-    ("settings.png", ["open home", "open settings"]),
-]
+SCREENS = {
+    "cardputer": [
+        ("home.png", ["open home"]),
+        ("chat.png", ["open chat 0"]),
+        ("identity.png", ["open home", "open node !1a2b3c4d"]),
+        ("nodes.png", ["open home", "open nodes"]),
+        ("settings.png", ["open home", "open settings"]),
+    ],
+    # The Tab5 is drawn turned both ways; frames are saved at half size.
+    "tab5": [
+        ("tab5-chat-landscape.png", ["rotate 1", "open chat 0"]),
+        ("tab5-node-landscape.png", ["rotate 1", "open node !1a2b3c4d"]),
+        ("tab5-chats-portrait.png", ["rotate 0", "open chats"]),
+        ("tab5-chat-portrait.png", ["rotate 0", "open chat 0"]),
+    ],
+}
 
 
-def screenshots(s, out_dir, scale):
+def screenshots(s, out_dir, scale, board):
     import os
     os.makedirs(out_dir, exist_ok=True)
     command(s, "demo", echo=False)
-    for name, steps in SCREENS:
+    for name, steps in SCREENS[board]:
         for step in steps:
             _, ok = command(s, step, echo=False)
             if not ok:
                 sys.exit(f"{step!r} failed")
-        time.sleep(0.5)  # let the main loop redraw
-        shot(s, os.path.join(out_dir, name), scale)
+        time.sleep(1.0)  # let the main loop redraw
+        if board == "tab5":
+            shot(s, os.path.join(out_dir, name), 1, 2)
+        else:
+            shot(s, os.path.join(out_dir, name), scale)
+    if board == "tab5":
+        command(s, "rotate auto", echo=False)
     command(s, "open home", echo=False)
     print("demo data stays loaded until the device reboots")
 
@@ -162,12 +177,14 @@ def main():
     p_shot = sub.add_parser("shot", help="save the current screen as PNG")
     p_shot.add_argument("path")
     p_shot.add_argument("--scale", type=int, default=1, help="integer upscale, e.g. 3")
+    p_shot.add_argument("--step", type=int, default=1, help="keep every n-th pixel (large panels)")
     p_wait = sub.add_parser("wait-link", help="wait until the link reaches a state")
     p_wait.add_argument("state")
     p_wait.add_argument("--timeout", type=float, default=60)
     p_screens = sub.add_parser("screenshots", help="capture the README screens on demo data")
     p_screens.add_argument("dir", nargs="?", default="docs/screens")
     p_screens.add_argument("--scale", type=int, default=3)
+    p_screens.add_argument("--board", choices=sorted(SCREENS), default="cardputer")
     sub.add_parser("logs", help="stream log lines")
     args = ap.parse_args()
 
@@ -180,9 +197,9 @@ def main():
             ok = ok and good
         sys.exit(0 if ok else 1)
     elif args.cmd == "shot":
-        shot(s, args.path, args.scale)
+        shot(s, args.path, args.scale, args.step)
     elif args.cmd == "screenshots":
-        screenshots(s, args.dir, args.scale)
+        screenshots(s, args.dir, args.scale, args.board)
     elif args.cmd == "wait-link":
         wait_link(s, args.state, args.timeout)
     elif args.cmd == "logs":

@@ -116,15 +116,6 @@ bool ListView::move(const KeyInput& k, int count, int rows) {
     return sel != before;
 }
 
-bool ListView::tapped(const KeyInput& k, int count, int rows, int rowOffset) {
-    int r = k.tapRow - rowOffset;
-    if (k.tapRow < 0 || r < 0 || r >= rows) return false;
-    int idx = top + r;
-    if (idx >= count) return false;
-    sel = idx;
-    return true;
-}
-
 void ListView::clamp(int count, int rows) {
     if (count <= 0) { sel = 0; top = 0; return; }
     if (sel >= count) sel = count - 1;

@@ -1,7 +1,8 @@
 #pragma once
 
-// Cardputer hardware: display, keyboard, beeper, battery, SD card.
-// Everything hardware-specific lives behind this header.
+// Device hardware: display, input, beeper, battery, storage. Everything
+// hardware-specific lives behind this header (board_cardputer.cpp,
+// board_tab5.cpp); the Tab5's display and touch are driven by its LVGL UI.
 
 #include <Arduino.h>
 #include <M5GFX.h>
@@ -15,7 +16,6 @@ struct KeyInput {
     bool fn = false;
     bool tab = false;
     std::vector<char> chars;  // printable characters, already shifted
-    int tapRow = -1;          // touch screens: content row tapped (list screens open it)
 
     bool has(char c) const {
         for (char k : chars) if (k == c) return true;
@@ -33,8 +33,9 @@ struct KeyInput {
 namespace Board {
 
 void begin();
-void update();  // call once per loop: scans keyboard, idles the speaker
+void update();  // call once per loop: scans input, idles the speaker
 
+#if !defined(MESHPUTER_BOARD_TAB5)
 // Off-screen frame buffer; screens draw here and call present().
 M5Canvas& canvas();
 void present();
@@ -43,6 +44,7 @@ void present();
 // short tap is not lost while the main loop is busy drawing.
 bool pollKeys(KeyInput& out);
 void scanKeyboard();  // extra keyboard-only scan, e.g. right after a redraw
+#endif
 
 void setBacklight(uint8_t level);  // 0 turns the panel off
 void displaySleep();

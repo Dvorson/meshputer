@@ -31,6 +31,7 @@ struct Settings {
     uint16_t dimAfterSec = 20;
     uint16_t screenOffSec = 60;     // 0 = never
     uint8_t themeIndex = 0;
+    uint8_t orientation = 0;        // touch screens: 0 follows the device, 1 portrait, 2 landscape
 
     std::string canned[kMaxCannedResponses];
 
