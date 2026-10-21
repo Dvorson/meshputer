@@ -201,9 +201,23 @@ void MeshtasticClient::processBleFlags() {
     }
 
     int reason = _flagDisconnected.exchange(0);
-    if (reason != 0 && (_state == LinkState::Connecting || _state == LinkState::Pairing ||
-                        _state == LinkState::Syncing || _state == LinkState::Ready)) {
-        dropLink("Link lost (" + std::to_string(reason) + ")", true);
+    // Asking for an up-front PIN, the link is already down: the radio's own
+    // disconnect after the failed pairing arrives late and must not close the prompt.
+    bool askingPin = _state == LinkState::Pairing && !BleLink::interactivePin();
+    if (reason != 0 && !askingPin &&
+        (_state == LinkState::Connecting || _state == LinkState::Pairing ||
+         _state == LinkState::Syncing || _state == LinkState::Ready)) {
+        // A radio that rejects the PIN drops the link before a stack that
+        // takes the PIN up front reports the failed pairing: ask for the PIN.
+        bool firstPairing = _state == LinkState::Syncing && _syncStep == SyncStep::Securing &&
+                            !BleLink::interactivePin() && !BleLink::isBonded(_radio.addr, _radio.addrType);
+        if (firstPairing) {
+            dropLink("Pairing failed - check the PIN", false);
+            _status = "Enter the radio's PIN";
+            setState(LinkState::Pairing);
+        } else {
+            dropLink("Link lost (" + std::to_string(reason) + ")", true);
+        }
     }
 
     // Only meaningful while a link is being set up; a late flag must not open
