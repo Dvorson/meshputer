@@ -1,5 +1,7 @@
 #include "kit.h"
 
+#include <cstring>
+
 #include "meshtastic_client.h"
 #include "settings.h"
 #include "theme.h"
@@ -24,11 +26,105 @@ void bare(lv_obj_t* o) {
 
 void onInputClicked(lv_event_t* e) { Tab5::editText(lv_event_get_target_obj(e)); }
 
+// ---- fonts ----------------------------------------------------------------------
+//
+// Each size is LVGL's built-in Montserrat (ASCII and the UI symbols, fastest),
+// falling back to a Montserrat subset (Latin, Cyrillic), then Noto Sans (Greek
+// and more), then colour emoji. The fonts and emoji are embedded in flash
+// (platformio.ini embed_files, built by tools/make_tab5_text_assets.py).
+
+extern "C" const uint8_t _binary_src_tab5_assets_text_ttf_start[];
+extern "C" const uint8_t _binary_src_tab5_assets_text_ttf_end[];
+extern "C" const uint8_t _binary_src_tab5_assets_more_ttf_start[];
+extern "C" const uint8_t _binary_src_tab5_assets_more_ttf_end[];
+extern "C" const uint8_t _binary_src_tab5_assets_emoji26_bin_start[];
+extern "C" const uint8_t _binary_src_tab5_assets_emoji26_bin_end[];
+
+constexpr int kFontCount = 6;
+constexpr int kEmojiPx = 26;
+constexpr int kEmojiBelowBaseline = 3;   // px the emoji reaches under the text baseline
+constexpr size_t kTtfGlyphCache = 128;
+const lv_font_t* const kBuiltins[kFontCount] = {
+    &lv_font_montserrat_20, &lv_font_montserrat_22, &lv_font_montserrat_26,
+    &lv_font_montserrat_28, &lv_font_montserrat_36, &lv_font_montserrat_48,
+};
+lv_font_t sFonts[kFontCount];  // mutable copies of the built-ins, to chain fallbacks
+
+struct EmojiEntry {
+    uint32_t codepoint;
+    uint32_t offset;
+    uint32_t length;
+};
+const EmojiEntry* sEmoji = nullptr;
+uint32_t sEmojiCount = 0;
+lv_image_dsc_t* sEmojiImages = nullptr;  // one descriptor per emoji, filled on first use
+
+uint32_t readU32(const uint8_t* p) { return p[0] | p[1] << 8 | p[2] << 16 | static_cast<uint32_t>(p[3]) << 24; }
+
+const void* emojiImage(const lv_font_t*, uint32_t unicode, uint32_t, int32_t* offsetY, void*) {
+    uint32_t lo = 0, hi = sEmojiCount;
+    while (lo < hi) {
+        uint32_t mid = (lo + hi) / 2;
+        uint32_t cp = readU32(reinterpret_cast<const uint8_t*>(&sEmoji[mid].codepoint));
+        if (cp == unicode) {
+            lv_image_dsc_t& img = sEmojiImages[mid];
+            if (img.data == nullptr) {
+                const uint8_t* e = reinterpret_cast<const uint8_t*>(&sEmoji[mid]);
+                img.header.magic = LV_IMAGE_HEADER_MAGIC;
+                img.header.cf = LV_COLOR_FORMAT_RAW_ALPHA;  // PNG, decoded by lodepng
+                img.header.w = kEmojiPx;
+                img.header.h = kEmojiPx;
+                img.data_size = readU32(e + 8);
+                img.data = _binary_src_tab5_assets_emoji26_bin_start + readU32(e + 4);
+            }
+            *offsetY = -kEmojiBelowBaseline;
+            return &img;
+        }
+        if (cp < unicode) lo = mid + 1;
+        else hi = mid;
+    }
+    return nullptr;
+}
+
+lv_font_t* loadEmoji() {
+    const uint8_t* blob = _binary_src_tab5_assets_emoji26_bin_start;
+    size_t size = _binary_src_tab5_assets_emoji26_bin_end - blob;
+    if (size < 8 || memcmp(blob, "EMJ1", 4) != 0) return nullptr;
+    sEmojiCount = readU32(blob + 4);
+    if (8 + static_cast<size_t>(sEmojiCount) * sizeof(EmojiEntry) > size) return nullptr;
+    sEmoji = reinterpret_cast<const EmojiEntry*>(blob + 8);
+    sEmojiImages = static_cast<lv_image_dsc_t*>(lv_calloc(sEmojiCount, sizeof(lv_image_dsc_t)));
+    return sEmojiImages ? lv_imgfont_create(kEmojiPx, emojiImage, nullptr) : nullptr;
+}
+
+void loadFonts() {
+    static bool loaded = false;
+    if (loaded) return;
+    loaded = true;
+    lv_font_t* emoji = loadEmoji();
+    for (int i = 0; i < kFontCount; ++i) {
+        static const int32_t kSizes[kFontCount] = {20, 22, 26, 28, 36, 48};
+        lv_font_t* more = lv_tiny_ttf_create_data_ex(
+            _binary_src_tab5_assets_more_ttf_start,
+            _binary_src_tab5_assets_more_ttf_end - _binary_src_tab5_assets_more_ttf_start, kSizes[i],
+            LV_FONT_KERNING_NORMAL, kTtfGlyphCache);
+        lv_font_t* text = lv_tiny_ttf_create_data_ex(
+            _binary_src_tab5_assets_text_ttf_start,
+            _binary_src_tab5_assets_text_ttf_end - _binary_src_tab5_assets_text_ttf_start, kSizes[i],
+            LV_FONT_KERNING_NORMAL, kTtfGlyphCache);
+        if (more) more->fallback = emoji;
+        if (text) text->fallback = more ? more : emoji;
+        sFonts[i] = *kBuiltins[i];
+        sFonts[i].fallback = text ? text : (more ? more : emoji);
+    }
+}
+
 } // namespace
 
 const Palette& pal() { return sPal; }
 
 void loadTheme(lv_display_t* display) {
+    loadFonts();
     const ColorTheme& t = *kThemes[Settings::get().themeIndex % kThemeCount];
     Palette& p = sPal;
     p.bg = hex(t.bg);
@@ -50,12 +146,12 @@ void loadTheme(lv_display_t* display) {
     lv_display_set_theme(display, theme);
 }
 
-const lv_font_t* caption() { return &lv_font_montserrat_20; }
-const lv_font_t* small() { return &lv_font_montserrat_22; }
-const lv_font_t* body() { return &lv_font_montserrat_26; }
-const lv_font_t* strong() { return &lv_font_montserrat_28; }
-const lv_font_t* title() { return &lv_font_montserrat_36; }
-const lv_font_t* display() { return &lv_font_montserrat_48; }
+const lv_font_t* caption() { return &sFonts[0]; }
+const lv_font_t* small() { return &sFonts[1]; }
+const lv_font_t* body() { return &sFonts[2]; }
+const lv_font_t* strong() { return &sFonts[3]; }
+const lv_font_t* title() { return &sFonts[4]; }
+const lv_font_t* display() { return &sFonts[5]; }
 
 lv_obj_t* box(lv_obj_t* parent) {
     lv_obj_t* o = lv_obj_create(parent);
@@ -305,9 +401,10 @@ lv_obj_t* segmented(lv_obj_t* parent, const char* const* map, int selected, lv_e
     lv_obj_set_style_shadow_width(m, 0, LV_PART_ITEMS);
     lv_obj_set_style_text_font(m, small(), LV_PART_ITEMS);
     lv_obj_set_style_text_color(m, sPal.text, LV_PART_ITEMS);
-    lv_obj_set_style_bg_opa(m, LV_OPA_COVER, LV_PART_ITEMS | LV_STATE_CHECKED);
-    lv_obj_set_style_bg_color(m, sPal.accent, LV_PART_ITEMS | LV_STATE_CHECKED);
-    lv_obj_set_style_text_color(m, sPal.onAccent, LV_PART_ITEMS | LV_STATE_CHECKED);
+    const lv_style_selector_t checked = static_cast<lv_style_selector_t>(LV_PART_ITEMS) | LV_STATE_CHECKED;
+    lv_obj_set_style_bg_opa(m, LV_OPA_COVER, checked);
+    lv_obj_set_style_bg_color(m, sPal.accent, checked);
+    lv_obj_set_style_text_color(m, sPal.onAccent, checked);
     if (cb) lv_obj_add_event_cb(m, cb, LV_EVENT_VALUE_CHANGED, user);
     return m;
 }

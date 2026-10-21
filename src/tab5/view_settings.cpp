@@ -71,9 +71,9 @@ std::string summary(int section) {
     switch (section) {
     case kProfile: {
         std::string n = myLongName();
-        return n.empty() ? "Connect a radio to set your name" : TextUtil::toDisplay(n);
+        return n.empty() ? "Connect a radio to set your name" : Board::screenText(n);
     }
-    case kInternet: return s.internetEnabled ? TextUtil::toDisplay(NostrService::status()) : "Off";
+    case kInternet: return s.internetEnabled ? Board::screenText(NostrService::status()) : "Off";
     case kDisplay:
         return std::string(kThemes[s.themeIndex % kThemeCount]->name) + ", " + kOrientationMap[s.orientation % 3] +
                (s.orientation == 0 ? " rotation" : "");
@@ -235,7 +235,7 @@ void SettingsView::buildProfile(lv_obj_t* page) {
         lv_obj_add_state(_short, LV_STATE_DISABLED);
         Kit::para(page, "Your name is stored on your radio. Connect it in Radio to change it.", Kit::body(), p.warn);
     } else {
-        Kit::para(page, "Saved to your radio " + TextUtil::toDisplay(gMesh.radio().name) + " (" +
+        Kit::para(page, "Saved to your radio " + Board::screenText(gMesh.radio().name) + " (" +
                             MeshProto::nodeIdString(gMesh.myNodeNum()) +
                             "). Other nodes learn the new name the next time it announces itself.",
                   Kit::small(), p.text2);
@@ -421,7 +421,7 @@ void SettingsView::buildReplies(lv_obj_t* page) {
     const Settings& s = Settings::get();
     lv_obj_t* card = Kit::card(page);
     for (int i = 0; i < kMaxCannedResponses; ++i) {
-        _replies[i] = Kit::input(card, "", TextUtil::toDisplay(s.canned[i]), kReplyMaxChars, "(empty)");
+        _replies[i] = Kit::input(card, "", Board::screenText(s.canned[i]), kReplyMaxChars, "(empty)");
         lv_obj_add_event_cb(_replies[i], onSaveReplies, LV_EVENT_READY, nullptr);
     }
     lv_obj_t* actions = Kit::hrow(page, 16);
@@ -468,7 +468,7 @@ void SettingsView::update() {
         return;
     }
     if (_ownerStatus) {
-        std::string msg = gMesh.ownerUpdate() == OwnerUpdate::Idle ? "" : TextUtil::toDisplay(gMesh.ownerMessage());
+        std::string msg = gMesh.ownerUpdate() == OwnerUpdate::Idle ? "" : Board::screenText(gMesh.ownerMessage());
         if (msg != _ownerShown) {
             _ownerShown = msg;
             lv_label_set_text(_ownerStatus, msg.c_str());
@@ -476,7 +476,7 @@ void SettingsView::update() {
     }
     if (_netStatus) {
         std::string msg = Settings::get().internetEnabled
-                              ? TextUtil::toDisplay(NostrService::status()) + ", " +
+                              ? Board::screenText(NostrService::status()) + ", " +
                                     std::to_string(NostrService::relaysOnline()) + " relay(s) online"
                               : "Off";
         if (msg != _netShown) {

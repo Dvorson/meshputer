@@ -76,3 +76,30 @@ TEST(ellipsize_cuts_with_dots) {
     CHECK_EQ(ellipsize("short", 10), std::string("short"));
     CHECK_EQ(ellipsize("a long node name", 8), std::string("a long.."));
 }
+
+TEST(ellipsize_counts_code_points) {
+    // "Привет мир" is 10 code points, 19 bytes.
+    CHECK_EQ(ellipsize("\xD0\x9F\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82 \xD0\xBC\xD0\xB8\xD1\x80", 10),
+             std::string("\xD0\x9F\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82 \xD0\xBC\xD0\xB8\xD1\x80"));
+    CHECK_EQ(ellipsize("\xD0\x9F\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82 \xD0\xBC\xD0\xB8\xD1\x80", 5),
+             std::string("\xD0\x9F\xD1\x80\xD0\xB8.."));
+}
+
+TEST(unicode_display_keeps_letters_and_emoji) {
+    std::string s = "\xD0\x9F\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82 \xCE\xB1\xCE\xB2 caf\xC3\xA9 \xF0\x9F\x91\x8D";
+    CHECK_EQ(toUnicodeDisplay(s), s);
+}
+
+TEST(unicode_display_drops_invisible_and_control) {
+    // thumbs up + medium skin tone, heart + VS16, family ZWJ sequence, a tab and a bell
+    CHECK_EQ(toUnicodeDisplay("\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBD"), std::string("\xF0\x9F\x91\x8D"));
+    CHECK_EQ(toUnicodeDisplay("\xE2\x9D\xA4\xEF\xB8\x8F"), std::string("\xE2\x9D\xA4"));
+    CHECK_EQ(toUnicodeDisplay("\xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9"),
+             std::string("\xF0\x9F\x91\xA8\xF0\x9F\x91\xA9"));
+    CHECK_EQ(toUnicodeDisplay("a\tb\x07" "c\nd"), std::string("a bc\nd"));
+}
+
+TEST(unicode_display_replaces_broken_bytes) {
+    CHECK_EQ(toUnicodeDisplay("ok\xC3"), std::string("ok?"));
+    CHECK_EQ(toUnicodeDisplay("\xFF" "a"), std::string("?a"));
+}

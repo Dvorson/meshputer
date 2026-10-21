@@ -67,6 +67,8 @@ designed for the 5" screen rather than scaled up from the Cardputer:
 - **Nodes** with each node's identity and signal and a *Message* button;
   **Radio** to scan, pair (PIN keypad) and connect; **Settings** for your name,
   internet chats with a QR code of the device's Nostr identity, display and sound.
+- Text as sent: Latin, Cyrillic, Greek and more, and 1,393 colour emoji, with
+  an emoji row next to the quick replies.
 - History is kept on the microSD card, or in internal flash when there is none.
 
 <p align="center">
@@ -190,7 +192,9 @@ Release and publishes the installer to Pages (`make site` + `make serve` to prev
 - Opening the serial port with RTS asserted and DTR released resets the ESP32-S3; the tool keeps DTR asserted.
 - History lives in `/meshputer/<node id>/` on the SD card, one text file per conversation
   (Tab5 without a card: the same layout in internal flash).
-- Tab5 text uses LVGL's built-in Latin fonts, so emoji show as `:codes:` as on the Cardputer.
+- The Cardputer's 6x8 font is ASCII: other letters are transliterated and emoji show
+  as `:codes:`. The Tab5 draws them, from fonts and emoji embedded in its firmware
+  (`src/tab5/assets`, rebuilt with `tools/make_tab5_text_assets.py`; SIL OFL 1.1).
 - If a radio was reflashed and refuses the old pairing, Meshputer drops the bond and pairs again; *Forget radio* does it by hand.
 
 ## License

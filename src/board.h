@@ -55,6 +55,10 @@ void beep(uint16_t freqHz, uint16_t ms, uint8_t volume, bool queue = false);
 
 int batteryPercent();  // -1 if unknown
 
+// Mesh text (UTF-8) as this screen can draw it: folded to ASCII codes on the
+// Cardputer's built-in font, kept as Unicode with emoji on the Tab5.
+std::string screenText(const std::string& utf8);
+
 // SD card (FAT). Paths are absolute, e.g. "/meshputer/abc/c0.txt".
 bool sdReady();
 bool readFile(const char* path, std::string& out);

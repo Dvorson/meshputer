@@ -4,6 +4,7 @@
 #if defined(MESHPUTER_BOARD_TAB5)
 
 #include "board.h"
+#include "core/text_util.h"
 
 #include <M5Unified.h>
 #include <LittleFS.h>
@@ -79,6 +80,8 @@ int batteryPercent() {
     int level = M5.Power.getBatteryLevel();
     return (level < 0 || level > 100) ? -1 : level;
 }
+
+std::string screenText(const std::string& utf8) { return TextUtil::toUnicodeDisplay(utf8); }
 
 bool sdReady() { return sSdReady; }
 

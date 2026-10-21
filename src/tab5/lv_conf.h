@@ -33,6 +33,16 @@
 
 #define LV_USE_QRCODE 1
 
+// Text beyond ASCII and colour emoji (see Kit::loadFonts): TrueType fonts and
+// PNG emoji embedded in flash, decoded images kept in a PSRAM cache.
+#define LV_USE_TINY_TTF 1
+#define LV_TINY_TTF_FILE_SUPPORT 0
+#define LV_TINY_TTF_CACHE_GLYPH_CNT 128
+#define LV_USE_IMGFONT 1
+#define LV_USE_LODEPNG 1
+#define LV_CACHE_DEF_SIZE (1024 * 1024)
+#define LV_IMAGE_HEADER_CACHE_DEF_CNT 256
+
 #define LV_BUILD_EXAMPLES 0
 
 #endif // LV_CONF_H

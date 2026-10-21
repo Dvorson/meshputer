@@ -6,9 +6,9 @@
 #include <cstdio>
 #include <vector>
 
+#include "board.h"
 #include "chat_service.h"
 #include "core/mesh_protocol.h"
-#include "core/text_util.h"
 #include "kit.h"
 #include "meshtastic_client.h"
 #include "views.h"
@@ -123,12 +123,12 @@ void NodesView::buildRows() {
         if (!n) continue;
         bool selected = landscape() && route().node == n->num;
         lv_obj_t* row = Kit::listRow(_list, selected, onRow, reinterpret_cast<void*>(i));
-        Kit::avatar(row, TextUtil::toDisplay(gMesh.nodeShortName(n->num)), n->num, 72);
+        Kit::avatar(row, Board::screenText(gMesh.nodeShortName(n->num)), n->num, 72);
         lv_obj_t* words = Kit::column(row, 4);
         lv_obj_set_width(words, LV_SIZE_CONTENT);
         lv_obj_set_flex_grow(words, 1);
         lv_obj_t* top = Kit::hrow(words, 12);
-        lv_obj_t* t = Kit::text(top, TextUtil::toDisplay(gMesh.nodeName(n->num)), Kit::strong(), p.text);
+        lv_obj_t* t = Kit::text(top, Board::screenText(gMesh.nodeName(n->num)), Kit::strong(), p.text);
         lv_obj_set_flex_grow(t, 1);
         Kit::oneLine(t);
         if (n->num == me) Kit::pill(top, "you", p.tint, p.accent);
@@ -163,20 +163,20 @@ void NodesView::buildDetail(Pane& pane) {
     _detailShown = true;
     _detailSig = signature(*n);
     bool isMe = n->num == gMesh.myNodeNum();
-    pane.setTitle(TextUtil::toDisplay(gMesh.nodeName(n->num)));
+    pane.setTitle(Board::screenText(gMesh.nodeName(n->num)));
     pane.setSubtitle(isMe ? "This radio" : MeshProto::nodeIdString(n->num));
 
     lv_obj_t* page = Kit::scroller(pane.body, 24);
     lv_obj_set_style_pad_all(page, Kit::kPad, 0);
 
     lv_obj_t* hero = Kit::hrow(page, 28);
-    Kit::avatar(hero, TextUtil::toDisplay(gMesh.nodeShortName(n->num)), n->num, 144);
+    Kit::avatar(hero, Board::screenText(gMesh.nodeShortName(n->num)), n->num, 144);
     lv_obj_t* who = Kit::column(hero, 6);
     lv_obj_set_width(who, LV_SIZE_CONTENT);
     lv_obj_set_flex_grow(who, 1);
-    lv_obj_t* name = Kit::para(who, TextUtil::toDisplay(gMesh.nodeName(n->num)), Kit::title(), p.text);
+    lv_obj_t* name = Kit::para(who, Board::screenText(gMesh.nodeName(n->num)), Kit::title(), p.text);
     (void)name;
-    std::string line = n->hasUser ? "\"" + TextUtil::toDisplay(n->user.shortName) + "\"" : "No identity received yet";
+    std::string line = n->hasUser ? "\"" + Board::screenText(n->user.shortName) + "\"" : "No identity received yet";
     Kit::text(who, line, Kit::body(), p.text2);
     if (!isMe) {
         std::string h = hops(*n), heard = ago(n->lastHeard);
@@ -194,8 +194,8 @@ void NodesView::buildDetail(Pane& pane) {
     lv_obj_set_style_pad_row(id, 4, 0);
     Kit::field(id, "Node ID", MeshProto::nodeIdString(n->num));
     if (n->hasUser) {
-        Kit::field(id, "Long name", TextUtil::toDisplay(n->user.longName));
-        Kit::field(id, "Short name", TextUtil::toDisplay(n->user.shortName));
+        Kit::field(id, "Long name", Board::screenText(n->user.longName));
+        Kit::field(id, "Short name", Board::screenText(n->user.shortName));
         Kit::field(id, "Hardware", MeshProto::hwModelName(n->user.hwModel));
         Kit::field(id, "Role", MeshProto::roleName(n->user.role));
         Kit::field(id, "Encrypted DMs", n->user.hasPublicKey ? "yes (public key known)" : "channel key only");

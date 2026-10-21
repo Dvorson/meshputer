@@ -96,6 +96,25 @@ std::string toDisplay(const std::string& utf8) {
     return out;
 }
 
+std::string toUnicodeDisplay(const std::string& utf8) {
+    std::string out;
+    out.reserve(utf8.size());
+    size_t i = 0;
+    while (i < utf8.size()) {
+        uint32_t cp = 0;
+        size_t n = decodeUtf8(utf8, i, cp);
+        if (n == 0) {
+            out += '?';
+            i += 1;
+            continue;
+        }
+        if (cp == '\t') out += ' ';
+        else if (cp == '\n' || !(cp < 0x20 || cp == 0x7F || isInvisible(cp))) out.append(utf8, i, n);
+        i += n;
+    }
+    return out;
+}
+
 std::string truncateUtf8(const std::string& utf8, size_t maxBytes) {
     if (utf8.size() <= maxBytes) return utf8;
     size_t cut = maxBytes;
@@ -142,9 +161,19 @@ std::vector<std::string> wrap(const std::string& text, size_t width) {
 }
 
 std::string ellipsize(const std::string& text, size_t width) {
-    if (text.size() <= width) return text;
-    if (width < 2) return text.substr(0, width);
-    return text.substr(0, width - 2) + "..";
+    // Byte offset after `count` code points (continuation bytes are 10xxxxxx).
+    auto prefix = [&](size_t count) {
+        size_t i = 0;
+        while (i < text.size() && count > 0) {
+            ++i;
+            while (i < text.size() && (static_cast<unsigned char>(text[i]) & 0xC0) == 0x80) ++i;
+            --count;
+        }
+        return i;
+    };
+    if (prefix(width) >= text.size()) return text;
+    if (width < 2) return text.substr(0, prefix(width));
+    return text.substr(0, prefix(width - 2)) + "..";
 }
 
 } // namespace TextUtil

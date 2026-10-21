@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <vector>
 
-#include "core/text_util.h"
+#include "board.h"
 #include "kit.h"
 #include "meshtastic_client.h"
 #include "settings.h"
@@ -128,14 +128,14 @@ void RadioView::buildStatus() {
     lv_obj_set_width(words, LV_SIZE_CONTENT);
     lv_obj_set_flex_grow(words, 1);
     std::string name = gMesh.radio().name.empty() ? Settings::get().radioName : gMesh.radio().name;
-    Kit::para(words, saved ? (name.empty() ? Settings::get().radioAddr : TextUtil::toDisplay(name)) : "No radio",
+    Kit::para(words, saved ? (name.empty() ? Settings::get().radioAddr : Board::screenText(name)) : "No radio",
               Kit::title(), p.text);
     Kit::text(words, Kit::linkText(), Kit::strong(), Kit::linkColor());
     std::string detail = gMesh.status() == Kit::linkText() ? "" : gMesh.status();
     uint32_t retry = gMesh.reconnectInMs();
     if (retry > 0 && st != LinkState::Ready) detail += (detail.empty() ? "" : ", ") + std::string("retrying in ") +
                                                         std::to_string((retry + 999) / 1000) + " s";
-    if (!detail.empty()) Kit::para(words, TextUtil::toDisplay(detail), Kit::small(), p.text2);
+    if (!detail.empty()) Kit::para(words, Board::screenText(detail), Kit::small(), p.text2);
 
     lv_obj_t* actions = Kit::hrow(_status, 16);
     lv_obj_set_flex_flow(actions, LV_FLEX_FLOW_ROW_WRAP);
@@ -203,7 +203,7 @@ void RadioView::buildNearby() {
         lv_obj_set_width(words, LV_SIZE_CONTENT);
         lv_obj_set_flex_grow(words, 1);
         lv_obj_t* top = Kit::hrow(words, 12);
-        lv_obj_t* t = Kit::text(top, r.name.empty() ? "Meshtastic radio" : TextUtil::toDisplay(r.name), Kit::strong(), p.text);
+        lv_obj_t* t = Kit::text(top, r.name.empty() ? "Meshtastic radio" : Board::screenText(r.name), Kit::strong(), p.text);
         lv_obj_set_flex_grow(t, 1);
         Kit::oneLine(t);
         if (r.addr == savedAddr) Kit::pill(top, "saved", p.tint, p.accent);

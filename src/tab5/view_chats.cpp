@@ -5,11 +5,12 @@
 #include <algorithm>
 #include <vector>
 
+#include "board.h"
 #include "chat_service.h"
 #include "core/crypto.h"
+#include "core/emoji.h"
 #include "core/mesh_protocol.h"
 #include "core/nostr.h"
-#include "core/text_util.h"
 #include "kit.h"
 #include "meshtastic_client.h"
 #include "nostr_service.h"
@@ -39,7 +40,20 @@ uint32_t seedFor(const ConversationKey& k) {
 std::string avatarLabel(const ConversationKey& k) {
     if (k.isNostr()) return "@";
     if (k.isChannel) return "#";
-    return TextUtil::toDisplay(gMesh.nodeShortName(k.peer));
+    return Board::screenText(gMesh.nodeShortName(k.peer));
+}
+
+// A horizontally scrolling row of chips.
+lv_obj_t* quickRow(lv_obj_t* parent) {
+    lv_obj_t* row = Kit::box(parent);
+    lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_add_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scroll_dir(row, LV_DIR_HOR);
+    lv_obj_set_scrollbar_mode(row, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_pad_hor(row, 16, 0);
+    lv_obj_set_style_pad_column(row, 12, 0);
+    return row;
 }
 
 std::string deliveryText(Delivery d) {
@@ -108,6 +122,7 @@ private:
     static void onSend(lv_event_t* e);
     static void onQuickToggle(lv_event_t* e);
     static void onQuick(lv_event_t* e);
+    static void onEmoji(lv_event_t* e);
     static void onNode(lv_event_t*);
     static void onStart(lv_event_t* e);
     static void onCancelNew(lv_event_t*) { back(); }
@@ -182,7 +197,7 @@ void ChatsView::buildRows() {
     _seenChat = Chat::store().revision();
     _seenMesh = gMesh.revision();
     _listAt = millis();
-    if (gMesh.ready()) _pane->setSubtitle("via " + TextUtil::toDisplay(gMesh.radio().name));
+    if (gMesh.ready()) _pane->setSubtitle("via " + Board::screenText(gMesh.radio().name));
     else if (gMesh.hasSavedRadio()) _pane->setSubtitle(std::string("Radio: ") + Kit::linkText());
     else _pane->setSubtitle("No radio connected");
 
@@ -214,7 +229,7 @@ void ChatsView::buildRows() {
         lv_obj_set_width(words, LV_SIZE_CONTENT);
         lv_obj_set_flex_grow(words, 1);
         lv_obj_t* top = Kit::hrow(words, 12);
-        std::string title = c ? Chat::title(*c) : "#" + TextUtil::toDisplay(gMesh.channelName(e.channel));
+        std::string title = c ? Chat::title(*c) : "#" + Board::screenText(gMesh.channelName(e.channel));
         lv_obj_t* t = Kit::text(top, title, Kit::strong(), p.text);
         lv_obj_set_flex_grow(t, 1);
         Kit::oneLine(t);
@@ -263,22 +278,27 @@ void ChatsView::buildConversation(Pane& pane) {
     lv_obj_set_flex_grow(_messages, 1);
     lv_obj_set_style_pad_all(_messages, Kit::kPad, 0);
 
-    _quick = Kit::box(pane.body);
-    lv_obj_set_size(_quick, lv_pct(100), LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(_quick, LV_FLEX_FLOW_ROW);
-    lv_obj_add_flag(_quick, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scroll_dir(_quick, LV_DIR_HOR);
-    lv_obj_set_scrollbar_mode(_quick, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_style_pad_hor(_quick, 16, 0);
+    // Quick replies (sent at once) and emoji (added to the message), above the composer.
+    _quick = Kit::column(pane.body, 12);
     lv_obj_set_style_pad_bottom(_quick, 12, 0);
-    lv_obj_set_style_pad_column(_quick, 12, 0);
+    lv_obj_t* replies = quickRow(_quick);
     const Settings& s = Settings::get();
     for (int i = 0; i < kMaxCannedResponses; ++i) {
         if (s.canned[i].empty()) continue;
-        lv_obj_t* chip = Kit::button(_quick, TextUtil::toDisplay(s.canned[i]), Kit::Btn::Secondary, onQuick,
+        lv_obj_t* chip = Kit::button(replies, Board::screenText(s.canned[i]), Kit::Btn::Secondary, onQuick,
                                      reinterpret_cast<void*>(static_cast<intptr_t>(i)));
         lv_obj_set_height(chip, 72);
         lv_obj_set_style_text_font(lv_obj_get_child(chip, 0), Kit::small(), 0);
+    }
+    lv_obj_t* emoji = quickRow(_quick);
+    for (int i = 0; i < kEmojiCount; ++i) {
+        if (static_cast<unsigned char>(kEmojis[i].utf8[0]) < 0x80) continue;  // text smileys like :)
+        lv_obj_t* chip = Kit::button(emoji, kEmojis[i].utf8, Kit::Btn::Ghost, onEmoji,
+                                     reinterpret_cast<void*>(static_cast<intptr_t>(i)));
+        lv_obj_set_size(chip, 72, 72);
+        lv_obj_set_style_min_width(chip, 72, 0);
+        lv_obj_set_style_pad_hor(chip, 0, 0);
+        lv_obj_set_style_text_font(lv_obj_get_child(chip, 0), Kit::body(), 0);
     }
     lv_obj_add_flag(_quick, LV_OBJ_FLAG_HIDDEN);
 
@@ -343,10 +363,10 @@ void ChatsView::buildMessages() {
         lv_obj_set_style_bg_opa(bubble, LV_OPA_COVER, 0);
         lv_obj_set_style_bg_color(bubble, m.fromMe ? p.mine : p.surface, 0);
         if (showSender && !m.fromMe) {
-            Kit::text(bubble, Chat::senderLabel(*c, m) + "  " + TextUtil::toDisplay(gMesh.nodeName(m.from)),
+            Kit::text(bubble, Chat::senderLabel(*c, m) + "  " + Board::screenText(gMesh.nodeName(m.from)),
                       Kit::caption(), Kit::avatarColor(m.from));
         }
-        lv_obj_t* body = Kit::text(bubble, TextUtil::toDisplay(m.text), Kit::body(), p.text);
+        lv_obj_t* body = Kit::text(bubble, Board::screenText(m.text), Kit::body(), p.text);
         lv_obj_set_style_max_width(body, _bubbleTextW, 0);
         std::string meta = ago(m.timestamp);
         if (m.fromMe) {
@@ -387,6 +407,12 @@ void ChatsView::onQuick(lv_event_t* e) {
     if (i < 0 || i >= kMaxCannedResponses) return;
     sView.send(Settings::get().canned[i]);
     if (sView._quick) lv_obj_add_flag(sView._quick, LV_OBJ_FLAG_HIDDEN);
+}
+
+void ChatsView::onEmoji(lv_event_t* e) {
+    int i = static_cast<int>(reinterpret_cast<intptr_t>(lv_event_get_user_data(e)));
+    if (!sView._input || i < 0 || i >= kEmojiCount) return;
+    lv_textarea_add_text(sView._input, kEmojis[i].utf8);
 }
 
 void ChatsView::onNode(lv_event_t*) {

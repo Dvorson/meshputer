@@ -95,8 +95,8 @@ void onText(const MeshProto::TextMessage& t) {
     if (idx < 0) return;  // duplicate
     persist(idx);
 
-    std::string who = TextUtil::toDisplay(gMesh.nodeShortName(t.from));
-    std::string text = TextUtil::toDisplay(t.text);
+    std::string who = Board::screenText(gMesh.nodeShortName(t.from));
+    std::string text = Board::screenText(t.text);
     for (char& c : text) if (c == '\n') c = ' ';
     setToast(who + ": " + text);
     Sound::message();
@@ -149,7 +149,7 @@ void loop() {
             break;
         }
         case MeshProto::EventKind::Notification:
-            setToast(TextUtil::toDisplay(ev.message));
+            setToast(Board::screenText(ev.message));
             break;
         default:
             break;
@@ -165,8 +165,8 @@ void loop() {
             idx = sStore.addIncoming(key, 0, in.text, in.ref, static_cast<uint32_t>(in.createdAt), !onScreen);
             if (idx < 0) continue;
             persist(idx);
-            setToast("@" + TextUtil::toDisplay(NostrService::displayName(in.fromHex)) + ": " +
-                     TextUtil::toDisplay(in.text));
+            setToast("@" + Board::screenText(NostrService::displayName(in.fromHex)) + ": " +
+                     Board::screenText(in.text));
             Sound::message();
             Power::wakeForMessage();
         } else {
@@ -240,21 +240,21 @@ std::string send(int convIdx, const std::string& utf8) {
 }
 
 std::string title(const Conversation& conv) {
-    if (conv.key.isNostr()) return "@" + TextUtil::toDisplay(NostrService::displayName(conv.key.nostr));
-    if (conv.key.isChannel) return "#" + TextUtil::toDisplay(gMesh.channelName(conv.key.channel));
-    return TextUtil::toDisplay(gMesh.nodeName(conv.key.peer));
+    if (conv.key.isNostr()) return "@" + Board::screenText(NostrService::displayName(conv.key.nostr));
+    if (conv.key.isChannel) return "#" + Board::screenText(gMesh.channelName(conv.key.channel));
+    return Board::screenText(gMesh.nodeName(conv.key.peer));
 }
 
 std::string senderLabel(const Conversation& conv, const ChatMessage& msg) {
     if (msg.fromMe) return "me";
-    if (conv.key.isNostr()) return TextUtil::toDisplay(NostrService::displayName(conv.key.nostr));
-    return TextUtil::toDisplay(gMesh.nodeShortName(msg.from));
+    if (conv.key.isNostr()) return Board::screenText(NostrService::displayName(conv.key.nostr));
+    return Board::screenText(gMesh.nodeShortName(msg.from));
 }
 
 std::string preview(const Conversation& conv, size_t width) {
     if (conv.messages.empty()) return "";
     const ChatMessage& m = conv.messages.back();
-    std::string text = TextUtil::toDisplay(m.text);
+    std::string text = Board::screenText(m.text);
     for (char& c : text) if (c == '\n') c = ' ';
     std::string who = senderLabel(conv, m);
     return TextUtil::ellipsize(who + ": " + text, width);

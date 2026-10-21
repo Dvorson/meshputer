@@ -14,6 +14,11 @@ namespace TextUtil {
 // Variation selectors, ZWJ and skin-tone modifiers are dropped.
 std::string toDisplay(const std::string& utf8);
 
+// UTF-8 for screens with Unicode fonts (Tab5): keeps letters and emoji, drops
+// control characters (newlines stay, tabs become spaces), variation selectors,
+// joiners and skin-tone modifiers, and turns broken bytes into '?'.
+std::string toUnicodeDisplay(const std::string& utf8);
+
 // Longest prefix of at most maxBytes that does not split a UTF-8 sequence.
 std::string truncateUtf8(const std::string& utf8, size_t maxBytes);
 
@@ -21,7 +26,7 @@ std::string truncateUtf8(const std::string& utf8, size_t maxBytes);
 // Words longer than a line are hard-split. Newlines force a break.
 std::vector<std::string> wrap(const std::string& text, size_t width);
 
-// Fit text into width characters, ending with ".." when cut.
+// Fit text into width characters (code points), ending with ".." when cut.
 std::string ellipsize(const std::string& text, size_t width);
 
 } // namespace TextUtil
